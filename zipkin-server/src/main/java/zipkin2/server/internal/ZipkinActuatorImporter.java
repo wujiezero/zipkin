@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server.internal;
 
@@ -71,11 +62,11 @@ public final class ZipkinActuatorImporter
     String[] includes =
       Binder.get(env).bind(PROPERTY_NAME_ACTUATOR_INCLUDE, String[].class).orElse(null);
     if (includes == null || includes.length == 0) {
-      LOG.debug("no actuator configuration found under path " + PROPERTY_NAME_ACTUATOR_INCLUDE);
+      LOG.debug("no actuator configuration found under path {}", PROPERTY_NAME_ACTUATOR_INCLUDE);
       return;
     }
 
-    LOG.debug("attempting to load actuator configuration: " + Arrays.toString(includes));
+    LOG.debug("attempting to load actuator configuration: {}", Arrays.toString(includes));
     try {
       context.registerBean(Class.forName(actuatorImplClass));
     } catch (Exception e) {
@@ -88,7 +79,7 @@ public final class ZipkinActuatorImporter
         context.registerBean(Class.forName(include));
       } catch (Exception e) {
         // Skip any classes that didn't match due to drift
-        LOG.debug("skipping unloadable actuator config " + include, e);
+        LOG.debug("skipping unloadable actuator config {}", include, e);
       }
     }
   }

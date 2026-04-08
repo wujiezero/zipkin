@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server.internal.ui;
 
@@ -21,15 +12,13 @@ import com.linecorp.armeria.common.RequestHeaders;
 import com.linecorp.armeria.server.Server;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.stream.Stream;
+import java.util.List;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.junit4.SpringRunner;
 import zipkin.server.ZipkinServer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,37 +31,36 @@ import static zipkin2.server.internal.ITZipkinServer.url;
   properties = {
     "server.port=0",
     "spring.config.name=zipkin-server",
-    "zipkin.ui.base-path=/foozipkin",
+    "zipkin.ui.base-path=/admin/zipkin",
     "server.compression.enabled=true",
     "server.compression.min-response-size=128"
   })
-@RunWith(SpringRunner.class)
-public class ITZipkinUiConfiguration {
+class ITZipkinUiConfiguration {
   @Autowired Server server;
   OkHttpClient client = new OkHttpClient.Builder().followRedirects(false).build();
 
-  @Test public void configJson() throws Exception {
-    assertThat(get("/zipkin/config.json").body().string()).isEqualTo(""
-      + "{\n"
-      + "  \"environment\" : \"\",\n"
-      + "  \"queryLimit\" : 10,\n"
-      + "  \"defaultLookback\" : 900000,\n"
-      + "  \"searchEnabled\" : true,\n"
-      + "  \"logsUrl\" : null,\n"
-      + "  \"supportUrl\" : null,\n"
-      + "  \"archivePostUrl\" : null,\n"
-      + "  \"archiveUrl\" : null,\n"
-      + "  \"dependency\" : {\n"
-      + "    \"enabled\" : true,\n"
-      + "    \"lowErrorRate\" : 0.5,\n"
-      + "    \"highErrorRate\" : 0.75\n"
-      + "  }\n"
-      + "}"
+  @Test void configJson() throws Exception {
+    assertThat(get("/zipkin/config.json").body().string()).isEqualTo("""
+      {
+        "environment" : "",
+        "queryLimit" : 10,
+        "defaultLookback" : 900000,
+        "searchEnabled" : true,
+        "logsUrl" : null,
+        "supportUrl" : null,
+        "archivePostUrl" : null,
+        "archiveUrl" : null,
+        "dependency" : {
+          "enabled" : true,
+          "lowErrorRate" : 0.5,
+          "highErrorRate" : 0.75
+        }
+      }"""
     );
   }
 
   /** The zipkin-lens is a single-page app. This prevents reloading all resources on each click. */
-  @Test public void setsMaxAgeOnUiResources() throws Exception {
+  @Test void setsMaxAgeOnUiResources() throws Exception {
     assertThat(get("/zipkin/config.json").header("Cache-Control"))
       .isEqualTo("max-age=600");
     assertThat(get("/zipkin/index.html").header("Cache-Control"))
@@ -81,12 +69,12 @@ public class ITZipkinUiConfiguration {
       .isEqualTo("max-age=31536000");
   }
 
-  @Test public void redirectsIndex() throws Exception {
+  @Test void redirectsIndex() throws Exception {
     String index = get("/zipkin/index.html").body().string();
 
     client = new OkHttpClient.Builder().followRedirects(true).build();
 
-    Stream.of("/zipkin", "/").forEach(path -> {
+    List.of("/zipkin", "/").forEach(path -> {
       try {
         assertThat(get(path).body().string()).isEqualTo(index);
       } catch (IOException e) {
@@ -96,8 +84,8 @@ public class ITZipkinUiConfiguration {
   }
 
   /** Browsers honor conditional requests such as eTag. Let's make sure the server does */
-  @Test public void conditionalRequests() {
-    Stream.of("/zipkin/config.json", "/zipkin/index.html", "/zipkin/test.txt").forEach(path -> {
+  @Test void conditionalRequests() {
+    List.of("/zipkin/config.json", "/zipkin/index.html", "/zipkin/test.txt").forEach(path -> {
       try {
         String etag = get(path).header("etag");
         assertThat(conditionalGet(path, etag).code())
@@ -111,7 +99,7 @@ public class ITZipkinUiConfiguration {
   }
 
   /** Some assets are pretty big. ensure they use compression. */
-  @Test public void supportsCompression() {
+  @Test void supportsCompression() {
     assertThat(getContentEncodingFromRequestThatAcceptsGzip("/zipkin/test.txt"))
       .isNull(); // too small to compress
     assertThat(getContentEncodingFromRequestThatAcceptsGzip("/zipkin/config.json"))
@@ -122,14 +110,24 @@ public class ITZipkinUiConfiguration {
    * The test sets the property {@code zipkin.ui.base-path=/foozipkin}, which should reflect in
    * index.html
    */
-  @Test public void replacesBaseTag() throws Exception {
-    assertThat(get("/zipkin/index.html").body().string())
-      .isEqualToIgnoringWhitespace(stringFromClasspath(getClass(), "zipkin-lens/index.html")
-        .replace("<base href=\"/\" />", "<base href=\"/foozipkin/\">"));
+  @Test void replacesBaseTag() throws Exception {
+    assertThat(get("/zipkin/index.html").body().string()).isEqualTo("""
+      <!-- simplified version of /zipkin-lens/index.html -->
+      <html>
+        <head>
+          <base href="/admin/zipkin/">
+          <link rel="icon" href="./favicon.ico">
+          <script type="module" crossorigin="" src="./static/js/index.js"></script>
+          <link rel="stylesheet" href="./static/css/index.css">
+        </head>
+        <body>zipkin-lens</body>
+      </html>
+      """
+    );
   }
 
   /** index.html is served separately. This tests other content is also loaded from the classpath. */
-  @Test public void servesOtherContentFromClasspath() throws Exception {
+  @Test void servesOtherContentFromClasspath() throws Exception {
     assertThat(get("/zipkin/test.txt").body().string())
       .isEqualToIgnoringWhitespace(stringFromClasspath(getClass(), "zipkin-lens/test.txt"));
   }

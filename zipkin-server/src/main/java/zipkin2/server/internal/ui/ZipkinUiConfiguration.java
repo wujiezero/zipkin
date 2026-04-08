@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server.internal.ui;
 
@@ -71,8 +62,7 @@ public class ZipkinUiConfiguration {
   @Autowired ZipkinUiProperties ui;
   @Value("classpath:zipkin-lens/index.html") Resource lensIndexHtml;
 
-  @Bean
-  HttpService indexService() throws Exception {
+  @Bean HttpService indexService() throws Exception {
     HttpService lensIndex = maybeIndexService(ui.getBasepath(), lensIndexHtml);
     if (lensIndex != null) return lensIndex;
     throw new BeanCreationException("Could not load Lens UI from " + lensIndexHtml);
@@ -172,12 +162,13 @@ public class ZipkinUiConfiguration {
       String content = StreamUtils.copyToString(stream, UTF_8);
       if (DEFAULT_BASEPATH.equals(basePath)) return content;
 
-      String baseTagValue = "/".equals(basePath) ? "/" : basePath + "/";
-      // html-webpack-plugin seems to strip out quotes from the base tag when compiling so be
-      // careful with this matcher.
-      return content.replaceAll(
-        "<base href=[^>]+>", "<base href=\"" + baseTagValue + "\">"
-      );
+      if (basePath.equals("/")) basePath = "";
+
+      // relativize any href or src in index.html
+      // TODO: see if vite config can make these relative by default!
+      return content.replace("=\"" + DEFAULT_BASEPATH, "=\".")
+        // set the base href, used in js, to absolute
+        .replace("<base href=\".", "<base href=\"" + basePath);
     }
   }
 }

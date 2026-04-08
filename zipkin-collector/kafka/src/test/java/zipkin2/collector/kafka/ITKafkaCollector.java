@@ -1,19 +1,9 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.collector.kafka;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -28,6 +18,7 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
@@ -51,10 +42,11 @@ import static zipkin2.codec.SpanBytesEncoder.THRIFT;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(60)
+@Tag("docker")
 class ITKafkaCollector {
-  @RegisterExtension KafkaExtension kafka = new KafkaExtension();
+  @RegisterExtension static KafkaExtension kafka = new KafkaExtension();
 
-  List<Span> spans = Arrays.asList(LOTS_OF_SPANS[0], LOTS_OF_SPANS[1]);
+  List<Span> spans = List.of(LOTS_OF_SPANS[0], LOTS_OF_SPANS[1]);
 
   InMemoryCollectorMetrics metrics = new InMemoryCollectorMetrics();
   InMemoryCollectorMetrics kafkaMetrics = metrics.forTransport("kafka");
@@ -269,7 +261,7 @@ class ITKafkaCollector {
       assertThat(receivedSpans.take()).containsExactlyElementsOf(spans);
     }
 
-    assertThat(threadsProvidingSpans.size()).isEqualTo(2);
+    assertThat(threadsProvidingSpans).hasSize(2);
 
     assertThat(kafkaMetrics.messages()).isEqualTo(3); // 2 + empty body for warmup
     assertThat(kafkaMetrics.messagesDropped()).isZero();
@@ -297,7 +289,7 @@ class ITKafkaCollector {
       collector.start();
 
       assertThat(collector).hasToString(
-        String.format("KafkaCollector{bootstrapServers=%s, topic=%s}", kafka.bootstrapServer(),
+        "KafkaCollector{bootstrapServers=%s, topic=%s}".formatted(kafka.bootstrapServer(),
           "muah")
       );
     }

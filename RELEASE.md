@@ -2,6 +2,12 @@
 
 This repo uses semantic versions. Please keep this in mind when choosing version numbers.
 
+1. **Verify all dependencies are up-to-date**
+
+   Before you start a release, make sure all dependencies are up-to-date, or are documented why not.
+   Pay special attention to the [security workflow](.github/workflows/security.yml), which should
+   run clean.
+
 1. **Alert others you are releasing**
 
    There should be no commits made to master while the release is in progress (about 10 minutes). Before you start
@@ -18,7 +24,7 @@ This repo uses semantic versions. Please keep this in mind when choosing version
    which creates commits, `MAJOR.MINOR.PATCH` tag, and increments the version (maven-release-plugin).
 
    The `MAJOR.MINOR.PATCH` tag triggers [`build-bin/deploy`](build-bin/deploy), which does the following:
-     * Publishes jars to https://oss.sonatype.org/content/repositories/releases [`build-bin/maven/maven_deploy`](build-bin/maven/maven_deploy)
+     * Publishes jars to Sonatype [`build-bin/maven/maven_deploy`](build-bin/maven/maven_deploy)
        * Later, the same jars synchronize to Maven Central
      * Publishes Javadoc to https://zipkin.io/brave into a versioned subdirectory
      * Pushes images to Docker registries [`build-bin/docker_push`](build-bin/docker_push)
@@ -33,7 +39,7 @@ look at the notes in [.github/workflows/deploy.yml] and check the [org secrets](
 
 ### Troubleshooting invalid credentials
 
-If you receive a '401 unauthorized' failure from OSSRH, it is likely
+If you receive a '401 unauthorized' failure from Sonatype, it is likely
 `SONATYPE_USER` or `SONATYPE_PASSWORD` entries are invalid, or possibly the
 user associated with them does not have rights to upload.
 
@@ -44,23 +50,6 @@ is a good way to validate that your unencrypted credentials are authorized.
 Here's an example of a snapshot deploy with specified credentials.
 ```bash
 $ export GPG_TTY=$(tty) && GPG_PASSPHRASE=whackamole SONATYPE_USER=adrianmole SONATYPE_PASSWORD=ed6f20bde9123bbb2312b221 build-bin/build-bin/maven/maven_deploy
-```
-
-## First release of the year
-
-The license plugin verifies license headers of files include a copyright notice indicating the years a file was affected.
-This information is taken from git history. There's a once-a-year problem with files that include version numbers (pom.xml).
-When a release tag is made, it increments version numbers, then commits them to git. On the first release of the year,
-further commands will fail due to the version increments invalidating the copyright statement. The way to sort this out is
-the following:
-
-Before you do the first release of the year, move the SNAPSHOT version back and forth from whatever the current is.
-In-between, re-apply the licenses.
-```bash
-$ ./mvnw versions:set -DnewVersion=1.3.3-SNAPSHOT -DgenerateBackupPoms=false
-$ ./mvnw com.mycila:license-maven-plugin:format
-$ ./mvnw versions:set -DnewVersion=1.3.2-SNAPSHOT -DgenerateBackupPoms=false
-$ git commit -am"Adjusts copyright headers for this year"
 ```
 
 ## Manually releasing

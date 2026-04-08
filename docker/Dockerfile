@@ -1,15 +1,6 @@
 #
-# Copyright 2015-2021 The OpenZipkin Authors
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-# in compliance with the License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License
-# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing permissions and limitations under
-# the License.
+# Copyright The OpenZipkin Authors
+# SPDX-License-Identifier: Apache-2.0
 #
 
 # java_version is used for install and runtime base layers of zipkin and zipkin-slim.
@@ -17,10 +8,10 @@
 # Use latest version here: https://github.com/orgs/openzipkin/packages/container/package/java
 # This is defined in many places because Docker has no "env" script functionality unless you use
 # docker-compose: When updating, update everywhere.
-ARG java_version=15.0.5_p3
+ARG java_version=25.0.2_p10
 
 # We copy files from the context into a scratch container first to avoid a problem where docker and
-# docker-compose don't share layer hashes https://github.com/docker/compose/issues/883 normally.
+# docker compose don't share layer hashes https://github.com/docker/compose/issues/883 normally.
 # COPY --from= works around the issue.
 FROM scratch as scratch
 
@@ -46,10 +37,19 @@ ENV RELEASE_FROM_MAVEN_BUILD=$release_from_maven_build
 ARG version=master
 ENV VERSION=$version
 ENV MAVEN_PROJECT_BASEDIR=/code
-RUN /code/build-bin/maven/maven_build_or_unjar io.zipkin zipkin-server ${VERSION} exec && \
+ARG TARGETARCH
+RUN test "${TARGETARCH}" != "" && \
+    if [ "${RELEASE_FROM_MAVEN_BUILD}" == "false" ]; then /code/build-bin/maybe_install_npm; fi; \
+    /code/build-bin/maven/maven_build_or_unjar io.zipkin zipkin-server ${VERSION} exec && \
     mv zipkin-server zipkin && \
     /code/build-bin/maven/maven_build_or_unjar io.zipkin zipkin-server ${VERSION} slim && \
-    mv zipkin-server zipkin-slim
+    mv zipkin-server zipkin-slim && \
+    # Copy tcnative deps to slim: 1.1MB more libs when pared to current platform.
+    cp zipkin/BOOT-INF/lib/*tcnative*.jar zipkin-slim/BOOT-INF/lib/ && \
+    # Remove any unused platform-specific jars. This results in none for s390x or non-linux.
+    rm */BOOT-INF/lib/*windows* */BOOT-INF/lib/*osx* && \
+    if [ "${TARGETARCH}" != "amd64" ]; then rm */BOOT-INF/lib/*x86*; fi && \
+    if [ "${TARGETARCH}" != "arm64" ]; then rm */BOOT-INF/lib/*a64* */BOOT-INF/lib/*aarch*; fi
 
 # Almost everything is common between the slim and normal build
 FROM ghcr.io/openzipkin/java:${java_version}-jre as base-server

@@ -1,21 +1,13 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -55,12 +47,12 @@ public abstract class Call<V> implements Cloneable {
    * output.
    */
   public static <V> Call<V> create(V v) {
-    return new Constant<V>(v);
+    return new Constant<>(v);
   }
 
   @SuppressWarnings("unchecked")
   public static <T> Call<List<T>> emptyList() {
-    return Call.create(Collections.<T>emptyList());
+    return Call.create(Collections.emptyList());
   }
 
   public interface Mapper<V1, V2> {
@@ -80,7 +72,7 @@ public abstract class Call<V> implements Cloneable {
    * in favor of the result of this method.
    */
   public final <R> Call<R> map(Mapper<V, R> mapper) {
-    return new Mapping<R, V>(mapper, this);
+    return new Mapping<>(mapper, this);
   }
 
   public interface FlatMapper<V1, V2> {
@@ -105,7 +97,7 @@ public abstract class Call<V> implements Cloneable {
    * in favor of the result of this method.
    */
   public final <R> Call<R> flatMap(FlatMapper<V, R> flatMapper) {
-    return new FlatMapping<R, V>(flatMapper, this);
+    return new FlatMapping<>(flatMapper, this);
   }
 
   public interface ErrorHandler<V> {
@@ -129,7 +121,7 @@ public abstract class Call<V> implements Cloneable {
    * }</pre>
    */
   public final Call<V> handleError(ErrorHandler<V> errorHandler) {
-    return new ErrorHandling<V>(errorHandler, this);
+    return new ErrorHandling<>(errorHandler, this);
   }
 
   // Taken from RxJava throwIfFatal, which was taken from scala
@@ -199,7 +191,7 @@ public abstract class Call<V> implements Cloneable {
     }
 
     @Override public Call<V> clone() {
-      return new Constant<V>(v);
+      return new Constant<>(v);
     }
 
     @Override public String toString() {
@@ -210,7 +202,7 @@ public abstract class Call<V> implements Cloneable {
       if (o == this) return true;
       if (o instanceof Constant) {
         Constant that = (Constant) o;
-        return ((this.v == null) ? (that.v == null) : this.v.equals(that.v));
+        return Objects.equals(this.v, that.v);
       }
       return false;
     }
@@ -258,7 +250,7 @@ public abstract class Call<V> implements Cloneable {
     }
 
     @Override public Call<R> clone() {
-      return new Mapping<R, V>(mapper, delegate.clone());
+      return new Mapping<>(mapper, delegate.clone());
     }
   }
 
@@ -303,7 +295,7 @@ public abstract class Call<V> implements Cloneable {
     }
 
     @Override public Call<R> clone() {
-      return new FlatMapping<R, V>(flatMapper, delegate.clone());
+      return new FlatMapping<>(flatMapper, delegate.clone());
     }
   }
 
@@ -368,7 +360,7 @@ public abstract class Call<V> implements Cloneable {
     }
 
     @Override public Call<V> clone() {
-      return new ErrorHandling<V>(errorHandler, delegate.clone());
+      return new ErrorHandling<>(errorHandler, delegate.clone());
     }
   }
 

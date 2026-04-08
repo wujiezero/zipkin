@@ -1,23 +1,14 @@
 /*
- * Copyright 2015-2019 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.elasticsearch; // to access package private stuff
 
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import zipkin2.Annotation;
 import zipkin2.Span;
 import zipkin2.TestObjects;
@@ -29,10 +20,10 @@ import static zipkin2.TestObjects.TODAY;
 import static zipkin2.elasticsearch.TestResponses.SPANS;
 import static zipkin2.elasticsearch.internal.JsonSerializers.JSON_FACTORY;
 
-public class SearchResultConverterTest {
+class SearchResultConverterTest {
   SearchResultConverter<Span> converter = SearchResultConverter.create(JsonSerializers.SPAN_PARSER);
 
-  @Test public void convert() throws IOException {
+  @Test void convert() throws IOException {
     // Our normal test data has recent timestamps to make testing the server and dependency linker
     // work as there are values related to recency used in search defaults.
     // This test needs stable timestamps because items like MD5 need to match.
@@ -50,23 +41,23 @@ public class SearchResultConverterTest {
       .containsExactlyElementsOf(stableTrace);
   }
 
-  @Test public void convert_noHits() throws IOException {
+  @Test void convert_noHits() throws IOException {
     assertThat(converter.convert(JSON_FACTORY.createParser("{}"), Assertions::fail))
       .isEmpty();
   }
 
-  @Test public void convert_onlyOneLevelHits() throws IOException {
+  @Test void convert_onlyOneLevelHits() throws IOException {
     assertThat(converter.convert(JSON_FACTORY.createParser("{\"hits\":{}}"), Assertions::fail))
       .isEmpty();
   }
 
-  @Test public void convert_hitsHitsButEmpty() throws IOException {
+  @Test void convert_hitsHitsButEmpty() throws IOException {
     assertThat(
       converter.convert(JSON_FACTORY.createParser("{\"hits\":{\"hits\":[]}}"), Assertions::fail))
       .isEmpty();
   }
 
-  @Test public void convert_hitsHitsButNoSource() throws IOException {
+  @Test void convert_hitsHitsButNoSource() throws IOException {
     assertThat(
       converter.convert(JSON_FACTORY.createParser("{\"hits\":{\"hits\":[{}]}}"), Assertions::fail))
       .isEmpty();

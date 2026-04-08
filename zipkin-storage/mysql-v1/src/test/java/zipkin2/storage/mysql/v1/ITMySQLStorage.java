@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.storage.mysql.v1;
 
@@ -24,6 +15,7 @@ import org.jooq.DSLContext;
 import org.jooq.Query;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.TestInstance;
@@ -35,9 +27,10 @@ import static zipkin2.storage.ITDependencies.aggregateLinks;
 import static zipkin2.storage.mysql.v1.internal.generated.tables.ZipkinDependencies.ZIPKIN_DEPENDENCIES;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Tag("docker")
 class ITMySQLStorage {
 
-  @RegisterExtension MySQLExtension mysql = new MySQLExtension();
+  @RegisterExtension static MySQLExtension mysql = new MySQLExtension();
 
   @Nested
   class ITTraces extends zipkin2.storage.ITTraces<MySQLStorage> {
@@ -57,7 +50,9 @@ class ITMySQLStorage {
       return false;
     }
 
-    @Override @Test @Disabled("No consumer-side span deduplication")
+    @Override
+    @Test
+    @Disabled("No consumer-side span deduplication")
     public void getTrace_deduplicates(TestInfo testInfo) {
     }
 

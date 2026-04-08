@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.storage;
 
@@ -123,6 +114,9 @@ public final class QueryRequest {
     for (Iterator<Map.Entry<String, String>> i = annotationQuery().entrySet().iterator();
       i.hasNext(); ) {
       Map.Entry<String, String> next = i.next();
+      if (next.getKey().isEmpty()) {
+        continue; // Values can be empty, but keys cannot. Don't err as we didn't before.
+      }
       result.append(next.getKey());
       if (!next.getValue().isEmpty()) result.append('=').append(next.getValue());
       if (i.hasNext()) result.append(" and ");
@@ -188,7 +182,7 @@ public final class QueryRequest {
      */
     public Builder parseAnnotationQuery(@Nullable String annotationQuery) {
       if (annotationQuery == null || annotationQuery.isEmpty()) return this;
-      Map<String, String> map = new LinkedHashMap<String, String>();
+      Map<String, String> map = new LinkedHashMap<>();
       for (String ann : annotationQuery.split(" and ", 100)) {
         int idx = ann.indexOf('=');
         if (idx == -1) {
@@ -243,14 +237,12 @@ public final class QueryRequest {
       return this;
     }
 
-    public final QueryRequest build() {
+    public QueryRequest build() {
       // coerce service and span names to lowercase
       if (serviceName != null) serviceName = serviceName.toLowerCase(Locale.ROOT);
       if (remoteServiceName != null) remoteServiceName = remoteServiceName.toLowerCase(Locale.ROOT);
       if (spanName != null) spanName = spanName.toLowerCase(Locale.ROOT);
 
-      // remove any accidental empty strings
-      annotationQuery.remove("");
       if ("".equals(serviceName)) serviceName = null;
       if ("".equals(remoteServiceName)) remoteServiceName = null;
       if ("".equals(spanName) || "all".equals(spanName)) spanName = null;
@@ -312,8 +304,7 @@ public final class QueryRequest {
     String serviceNameToMatch = serviceName();
     String remoteServiceNameToMatch = remoteServiceName();
     String spanNameToMatch = spanName();
-    Map<String, String> annotationQueryRemaining =
-      new LinkedHashMap<String, String>(annotationQuery());
+    Map<String, String> annotationQueryRemaining = new LinkedHashMap<>(annotationQuery());
 
     for (Span span : spans) {
       String localServiceName = span.localServiceName();

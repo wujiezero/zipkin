@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.storage.cassandra.internal.call;
 
@@ -104,11 +95,11 @@ public abstract class ResultSetFutureCall<V> extends Call.Base<V>
           interrupted = true;
         } catch (ExecutionException e) {
           Throwable cause = e.getCause();
-          if (cause instanceof DriverException) {
-            throw ((DriverException) cause).copy();
+          if (cause instanceof DriverException exception) {
+            throw exception.copy();
           }
-          if (cause instanceof RuntimeException) throw (RuntimeException) cause;
-          if (cause instanceof Error) throw (Error) cause;
+          if (cause instanceof RuntimeException exception) throw exception;
+          if (cause instanceof Error error) throw error;
           throw new DriverExecutionException(cause);
         }
       }

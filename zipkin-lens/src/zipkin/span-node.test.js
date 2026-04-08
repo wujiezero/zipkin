@@ -1,16 +1,8 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
+import { describe, it, expect } from 'vitest';
 import { SpanNode, SpanNodeBuilder } from './span-node';
 import { clean } from './span-cleaner';
 
@@ -51,7 +43,7 @@ describe('SpanNode', () => {
     expect(node.span).toEqual(span);
   });
 
-  it('should construct without a span', () => {
+  it('should have an undefined span field when there is no span', () => {
     const node = new SpanNode();
 
     expect(node.span).toBeUndefined();
@@ -236,7 +228,7 @@ describe('SpanNodeBuilder', () => {
     ]); // null first
   });
 
-  it('should order children by timestamp when IPs change ', () => {
+  it('should order children by timestamp when IPs change', () => {
     const trace = [
       {
         traceId: '1',

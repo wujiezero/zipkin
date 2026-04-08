@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 import PropTypes from 'prop-types';
 import React, { useMemo, useCallback } from 'react';
@@ -63,10 +54,10 @@ const defaultProps = {
 const ServiceBadgeImpl = ({ serviceName, count, onClick, onDelete }) => {
   const classes = useStyles();
 
-  const label = useMemo(() => `${serviceName}${count ? ` (${count})` : ''}`, [
-    count,
-    serviceName,
-  ]);
+  const label = useMemo(
+    () => `${serviceName}${count ? ` (${count})` : ''}`,
+    [count, serviceName],
+  );
 
   const handleClick = useCallback(() => {
     onClick(serviceName);
@@ -79,7 +70,7 @@ const ServiceBadgeImpl = ({ serviceName, count, onClick, onDelete }) => {
           onClick ? classes.clickableButton : ''
         }`}
         onClick={handleClick}
-        data-test="badge"
+        data-testid="badge"
       >
         {label}
       </Box>
@@ -87,7 +78,7 @@ const ServiceBadgeImpl = ({ serviceName, count, onClick, onDelete }) => {
         <Box
           className={`${classes.buttonBase} ${classes.clickableButton}`}
           onClick={onDelete}
-          data-test="delete-button"
+          data-testid="delete-button"
         >
           <FontAwesomeIcon icon={faTimes} />
         </Box>

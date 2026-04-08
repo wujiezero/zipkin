@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.storage.cassandra.internal;
 
@@ -35,9 +26,10 @@ import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.REQUES
 import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.REQUEST_LOGGER_SUCCESS_ENABLED;
 import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.REQUEST_LOGGER_VALUES;
 import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.REQUEST_TIMEOUT;
-import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.REQUEST_TRACKER_CLASS;
+import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.REQUEST_TRACKER_CLASSES;
 import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.REQUEST_WARN_IF_SET_KEYSPACE;
 import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.SSL_ENGINE_FACTORY_CLASS;
+import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.SSL_HOSTNAME_VALIDATION;
 
 public final class SessionBuilder {
   /** Returns a connected session. Closes the cluster if any exception occurred. */
@@ -46,7 +38,8 @@ public final class SessionBuilder {
     String localDc,
     Map<DriverOption, Integer> poolingOptions,
     @Nullable AuthProvider authProvider,
-    boolean useSsl
+    boolean useSsl,
+    boolean sslHostnameValidation
   ) {
     // Some options aren't supported by builder methods. In these cases, we use driver config
     // See https://groups.google.com/a/lists.datastax.com/forum/#!topic/java-driver-user/Z8HrCDX47Q0
@@ -76,12 +69,15 @@ public final class SessionBuilder {
     // All Zipkin CQL writes are idempotent
     config = config.withBoolean(REQUEST_DEFAULT_IDEMPOTENCE, true);
 
-    if (useSsl) config = config.withClass(SSL_ENGINE_FACTORY_CLASS, DefaultSslEngineFactory.class);
+    if (useSsl) {
+      config = config.withClass(SSL_ENGINE_FACTORY_CLASS, DefaultSslEngineFactory.class);
+      config = config.withBoolean(SSL_HOSTNAME_VALIDATION, sslHostnameValidation);
+    }
 
     // Log categories can enable query logging
-    Logger requestLogger = LoggerFactory.getLogger(RequestLogger.class);
+    Logger requestLogger = LoggerFactory.getLogger(SessionBuilder.class);
     if (requestLogger.isDebugEnabled()) {
-      config = config.withClass(REQUEST_TRACKER_CLASS, RequestLogger.class);
+      config = config.withClassList(REQUEST_TRACKER_CLASSES, List.of(RequestLogger.class));
       config = config.withBoolean(REQUEST_LOGGER_SUCCESS_ENABLED, true);
       // Only show bodies when TRACE is enabled
       config = config.withBoolean(REQUEST_LOGGER_VALUES, requestLogger.isTraceEnabled());

@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server.internal.prometheus;
 
@@ -32,7 +23,6 @@ import zipkin2.Span;
 import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.storage.InMemoryStorage;
 
-import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.annotation.DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD;
 import static zipkin2.TestObjects.LOTS_OF_SPANS;
@@ -53,13 +43,13 @@ import static zipkin2.server.internal.ITZipkinServer.url;
   webEnvironment = SpringBootTest.WebEnvironment.NONE, // RANDOM_PORT requires spring-web
   properties = {
     "server.port=0",
-    "spring.config.name=zipkin-server"
+    "spring.config.name=zipkin-server",
   }
 )
 // Clearing the prometheus registry also clears the metrics themselves, not just the values, so we
 // have to use dirties context so that each test runs in a separate instance of Spring Boot.
 @DirtiesContext(classMode = BEFORE_EACH_TEST_METHOD)
-public class ITZipkinMetricsDirty {
+class ITZipkinMetricsDirty {
 
   @Autowired InMemoryStorage storage;
   @Autowired PrometheusMeterRegistry registry;
@@ -73,7 +63,7 @@ public class ITZipkinMetricsDirty {
   }
 
   @Test void writeSpans_updatesMetrics() throws Exception {
-    List<Span> spans = asList(LOTS_OF_SPANS[0], LOTS_OF_SPANS[1], LOTS_OF_SPANS[2]);
+    List<Span> spans = List.of(LOTS_OF_SPANS[0], LOTS_OF_SPANS[1], LOTS_OF_SPANS[2]);
     byte[] body = SpanBytesEncoder.JSON_V2.encodeList(spans);
     double messagesCount =
       registry.counter("zipkin_collector.messages", "transport", "http").count();
@@ -134,7 +124,7 @@ public class ITZipkinMetricsDirty {
    * Makes sure the prometheus filter doesn't count twice
    */
   @Test void writeSpans_updatesPrometheusMetrics() throws Exception {
-    List<Span> spans = asList(LOTS_OF_SPANS[0], LOTS_OF_SPANS[1], LOTS_OF_SPANS[2]);
+    List<Span> spans = List.of(LOTS_OF_SPANS[0], LOTS_OF_SPANS[1], LOTS_OF_SPANS[2]);
     byte[] body = SpanBytesEncoder.JSON_V2.encodeList(spans);
 
     post("/api/v2/spans", body);

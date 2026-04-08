@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.storage;
 
@@ -148,7 +139,7 @@ public abstract class StorageComponent extends Component {
     /**
      * False is an attempt to disable indexing, leaving only {@link StorageComponent#traces()}
      * supported. For example, query requests will be disabled.
-     *
+     * <p>
      * The use case is typically to support 100% sampled data, or when traces are searched using
      * alternative means such as a logging index.
      *
@@ -162,7 +153,7 @@ public abstract class StorageComponent extends Component {
      * environment names. The getKeys here would appear in {@link Span#tags() span tags}. Good
      * choices for autocomplete are limited in cardinality for the same reasons as service and span
      * names.
-     *
+     * <p>
      * For example, "http.url" would be a bad choice for autocomplete, not just because it isn't
      * site-specific (such as environment would be), but also as there are unlimited getValues due
      * to factors such as unique ids in the path.

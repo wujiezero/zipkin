@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.storage;
 
@@ -19,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import zipkin2.Span;
 
-import static java.util.Arrays.asList;
 import static zipkin2.Span.Kind.SERVER;
 import static zipkin2.TestObjects.newClientSpan;
 import static zipkin2.TestObjects.newTraceId;
@@ -62,19 +52,19 @@ public abstract class ITTraces<T extends StorageComponent> extends ITStorage<T> 
     accept(clientSpan, serverSpan);
 
     // assertGetTraceReturns does recursive comparison
-    assertGetTraceReturns(clientSpan.traceId(), asList(clientSpan, serverSpan));
+    assertGetTraceReturns(clientSpan.traceId(), List.of(clientSpan, serverSpan));
   }
 
   @Test protected void getTraces_onlyReturnsTracesThatMatch(TestInfo testInfo) throws Exception {
     String testSuffix = testSuffix(testInfo);
     Span span1 = spanBuilder(testSuffix).build(), span2 = spanBuilder(testSuffix).build();
-    List<String> traceIds = asList(span1.traceId(), newTraceId());
+    List<String> traceIds = List.of(span1.traceId(), newTraceId());
 
     assertGetTracesReturnsEmpty(traceIds);
 
     accept(span1, span2);
 
-    assertGetTracesReturns(traceIds, asList(span1));
+    assertGetTracesReturns(traceIds, List.of(span1));
 
     List<String> shortTraceIds =
       traceIds.stream().map(t -> t.substring(16)).collect(Collectors.toList());
@@ -94,19 +84,19 @@ public abstract class ITTraces<T extends StorageComponent> extends ITStorage<T> 
     accept(clientSpan, serverSpan);
 
     // assertGetTracesReturns does recursive comparison
-    assertGetTracesReturns(asList(clientSpan.traceId()), asList(clientSpan, serverSpan));
+    assertGetTracesReturns(List.of(clientSpan.traceId()), List.of(clientSpan, serverSpan));
   }
 
   @Test protected void getTraces_returnsEmptyOnNotFound(TestInfo testInfo) throws Exception {
     String testSuffix = testSuffix(testInfo);
     Span span1 = spanBuilder(testSuffix).build(), span2 = spanBuilder(testSuffix).build();
-    List<String> traceIds = asList(span1.traceId(), span2.traceId());
+    List<String> traceIds = List.of(span1.traceId(), span2.traceId());
 
     assertGetTracesReturnsEmpty(traceIds);
 
     accept(span1, span2);
 
-    assertGetTracesReturns(traceIds, asList(span1), asList(span2));
+    assertGetTracesReturns(traceIds, List.of(span1), List.of(span2));
 
     List<String> shortTraceIds =
       traceIds.stream().map(t -> t.substring(16)).collect(Collectors.toList());

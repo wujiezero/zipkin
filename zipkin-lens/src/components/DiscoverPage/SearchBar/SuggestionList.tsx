@@ -1,20 +1,11 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 import { CircularProgress } from '@material-ui/core';
 import React, { useEffect, useRef } from 'react';
 import styled from 'styled-components';
+import { getTheme } from '../../../util/theme';
 
 const Root = styled.div<{ isLoading: boolean }>`
   position: absolute;
@@ -43,7 +34,7 @@ const List = styled.ul`
   list-style-type: none;
   margin: 0px;
   padding: 0px;
-  font-size: 1.1rem;
+  font-size: 1rem;
 `;
 
 const ListItem = styled.li<{ isFocused: boolean }>`
@@ -55,7 +46,10 @@ const ListItem = styled.li<{ isFocused: boolean }>`
     `5px solid ${isFocused ? theme.palette.primary.main : 'rgba(0, 0, 0, 0)'}`};
   cursor: pointer;
   &:hover {
-    background-color: ${({ theme }) => theme.palette.grey[300]};
+    background-color: ${({ theme }) =>
+      getTheme() === 'dark'
+        ? theme.palette.grey[600]
+        : theme.palette.grey[300]};
   }
 `;
 

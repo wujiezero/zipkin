@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server.internal.prometheus;
 
@@ -35,7 +26,6 @@ import zipkin2.Span;
 import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.storage.InMemoryStorage;
 
-import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static zipkin2.TestObjects.LOTS_OF_SPANS;
 import static zipkin2.server.internal.ITZipkinServer.url;
@@ -49,10 +39,10 @@ import static zipkin2.server.internal.ITZipkinServer.url;
   webEnvironment = SpringBootTest.WebEnvironment.NONE, // RANDOM_PORT requires spring-web
   properties = {
     "server.port=0",
-    "spring.config.name=zipkin-server"
+    "spring.config.name=zipkin-server",
   }
 )
-public class ITZipkinMetrics {
+class ITZipkinMetrics {
   @Autowired InMemoryStorage storage;
   @Autowired PrometheusMeterRegistry registry;
   @Autowired Server server;
@@ -78,13 +68,13 @@ public class ITZipkinMetrics {
 
     // ensure we don't track prometheus, UI requests in prometheus
     assertThat(scrape())
-      .doesNotContain("prometheus")
+      .doesNotContain("uri=\"/prometheus")
       .doesNotContain("uri=\"/zipkin")
       .doesNotContain("uri=\"/\"");
   }
 
   @Test void apiTemplate_prometheus() throws Exception {
-    List<Span> spans = asList(LOTS_OF_SPANS[0]);
+    List<Span> spans = List.of(LOTS_OF_SPANS[0]);
     byte[] body = SpanBytesEncoder.JSON_V2.encodeList(spans);
     assertThat(post("/api/v2/spans", body).isSuccessful())
       .isTrue();
@@ -134,7 +124,7 @@ public class ITZipkinMetrics {
 
   @Test void writesSpans_readMetricsFormat() throws Exception {
     byte[] span = {'z', 'i', 'p', 'k', 'i', 'n'};
-    List<Span> spans = asList(LOTS_OF_SPANS[0], LOTS_OF_SPANS[1], LOTS_OF_SPANS[2]);
+    List<Span> spans = List.of(LOTS_OF_SPANS[0], LOTS_OF_SPANS[1], LOTS_OF_SPANS[2]);
     byte[] body = SpanBytesEncoder.JSON_V2.encodeList(spans);
     post("/api/v2/spans", body);
     post("/api/v2/spans", body);
@@ -144,7 +134,14 @@ public class ITZipkinMetrics {
     String metrics = getAsString("/metrics");
 
     assertThat(readJson(metrics)).containsOnlyKeys(
-      "gauge.zipkin_collector.message_spans.http"
+      "gauge.zipkin_collector.message_spans.grpc"
+      , "gauge.zipkin_collector.message_bytes.grpc"
+      , "counter.zipkin_collector.messages.grpc"
+      , "counter.zipkin_collector.bytes.grpc"
+      , "counter.zipkin_collector.spans.grpc"
+      , "counter.zipkin_collector.messages_dropped.grpc"
+      , "counter.zipkin_collector.spans_dropped.grpc"
+      , "gauge.zipkin_collector.message_spans.http"
       , "gauge.zipkin_collector.message_bytes.http"
       , "counter.zipkin_collector.messages.http"
       , "counter.zipkin_collector.bytes.http"

@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2019 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server.internal;
 
@@ -20,11 +11,9 @@ import java.io.InterruptedIOException;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.junit4.SpringRunner;
 import zipkin.server.ZipkinServer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,17 +25,16 @@ import static zipkin2.server.internal.ITZipkinServer.url;
   webEnvironment = SpringBootTest.WebEnvironment.NONE, // RANDOM_PORT requires spring-web
   properties = {
     "server.port=0",
-    "spring.config.name=zipkin-server"
+    "spring.config.name=zipkin-server",
   }
 )
-@RunWith(SpringRunner.class)
-public class ITActuatorMappings {
+class ITActuatorMappings {
   @Autowired PrometheusMeterRegistry registry;
   @Autowired Server server;
 
   OkHttpClient client = new OkHttpClient.Builder().followRedirects(true).build();
 
-  @Test public void actuatorIsOK() throws Exception {
+  @Test void actuatorIsOK() throws Exception {
     assumeThat(get("/actuator").isSuccessful()) // actuator is optional
       .isTrue();
 
@@ -55,7 +43,7 @@ public class ITActuatorMappings {
       .doesNotContain("actuator");
   }
 
-  @Test public void actuatorInfoEndpointHasDifferentContentType() throws IOException {
+  @Test void actuatorInfoEndpointHasDifferentContentType() throws IOException {
     Response info = get("/info");
     Response actuatorInfo = get("/actuator/info");
 
@@ -74,7 +62,7 @@ public class ITActuatorMappings {
       .doesNotContain("/info");
   }
 
-  @Test public void actuatorHealthEndpointHasDifferentContentType() throws IOException {
+  @Test void actuatorHealthEndpointHasDifferentContentType() throws IOException {
     Response health = get("/health");
     Response actuatorHealth = get("/actuator/health");
 

@@ -1,4 +1,6 @@
-spring.main.web-application-type: none
+spring:
+  main:
+    web-application-type: none
 
 # We are using Armeria instead of Tomcat. Have it inherit the default configuration from Spring
 armeria:

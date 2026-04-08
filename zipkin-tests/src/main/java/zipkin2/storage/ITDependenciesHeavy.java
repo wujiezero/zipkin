@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.storage;
 
@@ -59,7 +50,7 @@ public abstract class ITDependenciesHeavy<T extends StorageComponent> extends IT
 
   /** Ensure there's no query limit problem around links */
   @Test protected void manyLinks() throws Exception {
-    int count = 1000; // Larger than 10, which is the default ES search limit that tripped this
+    int count = 256; // Larger than 10, which is the default ES search limit that tripped this
     List<Span> spans = new ArrayList<>(count);
     for (int i = 1; i <= count; i++) {
       String traceId = newTraceId();

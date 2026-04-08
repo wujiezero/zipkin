@@ -1,26 +1,16 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 import PropTypes from 'prop-types';
 import React, { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 
-import TraceSummary from './TraceSummary';
 import { setAlert } from '../App/slice';
 import { LoadingIndicator } from '../common/LoadingIndicator';
 import { loadTrace } from '../../slices/tracesSlice';
+import { TracePageContent } from './TracePageContent';
 
 const propTypes = {
   match: PropTypes.shape({
@@ -33,9 +23,10 @@ const propTypes = {
 export const TracePageImpl = React.memo(({ match }) => {
   const { traceId } = match.params;
 
-  const { isLoading, traceSummary, error } = useSelector((state) => ({
+  const { isLoading, traceSummary, error, rawTrace } = useSelector((state) => ({
     isLoading: state.traces.traces[traceId]?.isLoading || false,
     traceSummary: state.traces.traces[traceId]?.adjustedTrace || undefined,
+    rawTrace: state.traces.traces[traceId]?.rawTrace || undefined,
     error: state.traces.traces[traceId]?.error || undefined,
   }));
 
@@ -71,10 +62,10 @@ export const TracePageImpl = React.memo(({ match }) => {
     return <LoadingIndicator />;
   }
 
-  if (!traceSummary) {
+  if (!traceSummary || !rawTrace) {
     return null;
   }
-  return <TraceSummary traceSummary={traceSummary} />;
+  return <TracePageContent trace={traceSummary} rawTrace={rawTrace} />;
 });
 
 TracePageImpl.propTypes = propTypes;

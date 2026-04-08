@@ -1,67 +1,108 @@
-# yamllint --format github .github/workflows/test.yml
 ---
 name: test
 
 # We don't test documentation-only commits.
-on:
-  # We run tests on non-tagged pushes to master that aren't a commit made by the release plugin
-  push:
-    tags: ''
-    branches: master
-    paths-ignore: '**/*.md'
-  # We also run tests on pull requests targeted at the master branch.
-  pull_request:
-    branches: master
-    paths-ignore: '**/*.md'
+on:  # yamllint disable-line rule:truthy
+  push:  # non-tagged pushes to master
+    branches:
+      - master
+    tags-ignore:
+      - '*'
+    paths-ignore:
+      - '**/*.md'
+      - './build-bin/*lint'
+      - ./build-bin/mlc_config.json
+  pull_request:  # pull requests targeted at the master branch.
+    branches:
+      - master
+    paths-ignore:
+      - '**/*.md'
+      - './build-bin/*lint'
+      - ./build-bin/mlc_config.json
 
 jobs:
   test:
-    runs-on: ubuntu-20.04  # newest available distribution, aka focal
+    name: test (JDK ${{ matrix.java_version }})
+    runs-on: ubuntu-24.04  # newest available distribution, aka noble
+    # skip commits made by the release plugin
     if: "!contains(github.event.head_commit.message, 'maven-release-plugin')"
+    strategy:
+      fail-fast: false  # don't fail fast as some failures are LTS specific
+      matrix:  # match with maven-enforcer-plugin rules in pom.xml
+        include:
+          - java_version: 21  # Earliest LTS that can compile Zipkin
+            maven_args: -Prelease -Dgpg.skip
+          - java_version: 25  # Most recent LTS
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6
+      - name: Setup java
+        uses: actions/setup-java@v5
         with:
-          fetch-depth: 0  # full git history for license check
+          distribution: 'zulu'  # zulu as it supports a wide version range
+          java-version: ${{ matrix.java_version }}
       - name: Cache local Maven repository
-        uses: actions/cache@v2
+        uses: actions/cache@v5
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven-
+          # yamllint disable-line rule:line-length
+          key: ${{ runner.os }}-jdk-${{ matrix.java_version }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-jdk-${{ matrix.java_version }}-maven-
       - name: Cache NPM Packages
-        uses: actions/cache@v2
+        uses: actions/cache@v5
         with:
           path: ~/.npm
+          # yamllint disable-line rule:line-length
           key: ${{ runner.os }}-npm-packages-${{ hashFiles('zipkin-lens/package-lock.json') }}
       - name: Test without Docker
-        run: build-bin/maven_go_offline && build-bin/test -Ddocker.skip=true
+        run: |
+          build-bin/maven_go_offline &&
+          build-bin/test -DexcludedGroups=docker ${{ matrix.maven_args }}
+
   test_docker:
-    runs-on: ubuntu-20.04  # newest available distribution, aka focal
+    runs-on: ubuntu-24.04  # newest available distribution, aka noble
+    # skip commits made by the release plugin
     if: "!contains(github.event.head_commit.message, 'maven-release-plugin')"
     strategy:
       matrix:
         include:
+          - name: zipkin-collector-activemq
           - name: zipkin-collector-kafka
           - name: zipkin-collector-rabbitmq
+          - name: zipkin-collector-pulsar
           - name: zipkin-storage-cassandra
           - name: zipkin-storage-elasticsearch
           - name: zipkin-storage-mysql-v1
+          - name: zipkin-server
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6
+      - name: Setup java
+        uses: actions/setup-java@v5
         with:
-          fetch-depth: 1  # -Dlicense.skip=true so we don't need a full clone
+          distribution: 'zulu'  # zulu as it supports a wide version range
+          java-version: '25'  # Most recent LTS
       - name: Cache local Maven repository
-        uses: actions/cache@v2
+        uses: actions/cache@v5
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven-
-      # We can't cache Docker without using buildx because GH actions restricts /var/lib/docker
-      # That's ok because DOCKER_PARENT_IMAGE is always ghcr.io and local anyway.
+          # yamllint disable-line rule:line-length
+          key: ${{ runner.os }}-jdk-${{ matrix.java_version }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-jdk-${{ matrix.java_version }}-maven-
+      # Don't attempt to cache Docker. Sensitive information can be stolen
+      # via forks, and login session ends up in ~/.docker. This is ok because
+      # we publish DOCKER_PARENT_IMAGE to ghcr.io, hence local to the runner.
       - name: Test with Docker
-        run: |  # configure_test seeds NPM cache, which isn't needed for these tests
-          build-bin/maven/maven_go_offline &&
+        # configure_test seeds NPM cache, which isn't needed for these tests.
+        #
+        # What we are doing here is configuring docker, then installing the
+        # module's dependencies prior to testing it with docker. This allows
+        # us to avoid running tests except the leaf module.
+        run: |
           build-bin/docker/configure_docker &&
-          build-bin/test -pl :${{ matrix.name }} --am -Dlicense.skip=true
+          build-bin/maven/maven_go_offline &&
+          build-bin/maven/maven_build -pl :${{ matrix.name }} --am &&
+          build-bin/test -Dgroups=docker -pl :${{ matrix.name }}
+        env:
+          MAVEN_GOAL: install  # docker build needs dependencies in mavenLocal
+          MAVEN_CONFIG: '-Dlicense.skip=true'  # license check already run

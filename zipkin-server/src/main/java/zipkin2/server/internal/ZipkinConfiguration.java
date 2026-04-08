@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2019 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server.internal;
 
@@ -67,10 +58,10 @@ public class ZipkinConfiguration {
     BeanFactory beanFactory;
 
     @Override public Object postProcessAfterInitialization(Object bean, String beanName) {
-      if (bean instanceof StorageComponent) {
+      if (bean instanceof StorageComponent component) {
         ZipkinStorageThrottleProperties throttleProperties =
           beanFactory.getBean(ZipkinStorageThrottleProperties.class);
-        return new ThrottledStorageComponent((StorageComponent) bean,
+        return new ThrottledStorageComponent(component,
           beanFactory.getBean(MeterRegistry.class),
           beanFactory.containsBean("tracing") ? beanFactory.getBean(Tracing.class) : null,
           throttleProperties.getMinConcurrency(),
@@ -100,9 +91,9 @@ public class ZipkinConfiguration {
     }
 
     @Override public Object postProcessAfterInitialization(Object bean, String beanName) {
-      if (bean instanceof StorageComponent && beanFactory.containsBean("tracing")) {
+      if (bean instanceof StorageComponent component && beanFactory.containsBean("tracing")) {
         Tracing tracing = beanFactory.getBean(Tracing.class);
-        return new TracingStorageComponent(tracing, (StorageComponent) bean);
+        return new TracingStorageComponent(tracing, component);
       }
       return bean;
     }

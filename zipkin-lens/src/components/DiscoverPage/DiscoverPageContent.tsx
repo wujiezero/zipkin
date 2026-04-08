@@ -1,31 +1,17 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
-
-/* eslint-disable no-shadow */
-
 import { faHistory, faSync, faSearch } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Trans } from '@lingui/macro';
 import {
   Box,
   Button,
   ButtonGroup,
   ButtonProps,
   Collapse,
-  Container,
   Divider,
-  Paper,
+  makeStyles,
   TextField,
   Typography,
 } from '@material-ui/core';
@@ -38,7 +24,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useHistory, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
-
+import { Trans, useTranslation } from 'react-i18next';
 import Criterion, { newCriterion } from './Criterion';
 import LookbackMenu from './LookbackMenu';
 import SearchBar from './SearchBar';
@@ -426,15 +412,36 @@ const useTraceSummaryOpenState = (traceSummaries: TraceSummary[]) => {
   };
 };
 
+const useStyles = makeStyles((theme) => ({
+  searchRow: {
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    display: 'flex',
+    padding: theme.spacing(1.5, 3),
+  },
+  settings: {
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    padding: theme.spacing(1, 3),
+  },
+  resultHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: theme.spacing(1.5, 3),
+  },
+}));
+
 const DiscoverPageContent: React.FC<DiscoverPageContentProps> = ({
   autocompleteKeys,
 }) => {
+  const classes = useStyles();
   // Retrieve search criteria from the URL query string and use them to search for traces.
-  const { setQueryParams, criteria, lookback, limit } = useQueryParams(
-    autocompleteKeys,
-  );
+  const { setQueryParams, criteria, lookback, limit } =
+    useQueryParams(autocompleteKeys);
   useFetchTraces(autocompleteKeys, criteria, lookback, limit);
-
+  const { t } = useTranslation();
   // Temporary search criteria.
   const [tempCriteria, setTempCriteria] = useState(criteria);
   const { defaultLookback, queryLimit } = useUiConfig();
@@ -497,12 +504,8 @@ const DiscoverPageContent: React.FC<DiscoverPageContentProps> = ({
     setIsOpeningSettings((prev) => !prev);
   }, []);
 
-  const {
-    filters,
-    handleFiltersChange,
-    filterOptions,
-    toggleFilter,
-  } = useFilters(traceSummaries);
+  const { filters, handleFiltersChange, filterOptions, toggleFilter } =
+    useFilters(traceSummaries);
 
   const {
     traceSummaryOpenMap,
@@ -548,9 +551,9 @@ const DiscoverPageContent: React.FC<DiscoverPageContentProps> = ({
     content = (
       <ExplainBox
         icon={faSearch}
-        headerText={<Trans>Search Traces</Trans>}
+        headerText={<Trans t={t}>Search Traces</Trans>}
         text={
-          <Trans>
+          <Trans t={t}>
             Please select criteria in the search bar. Then, click the search
             button.
           </Trans>
@@ -559,14 +562,12 @@ const DiscoverPageContent: React.FC<DiscoverPageContentProps> = ({
     );
   } else {
     content = (
-      <Paper elevation={3}>
-        <TraceSummaryTable
-          traceSummaries={filteredTraceSummaries}
-          toggleFilter={toggleFilter}
-          traceSummaryOpenMap={traceSummaryOpenMap}
-          toggleTraceSummaryOpen={toggleTraceSummaryOpen}
-        />
-      </Paper>
+      <TraceSummaryTable
+        traceSummaries={filteredTraceSummaries}
+        toggleFilter={toggleFilter}
+        traceSummaryOpenMap={traceSummaryOpenMap}
+        toggleTraceSummaryOpen={toggleTraceSummaryOpen}
+      />
     );
   }
 
@@ -576,123 +577,97 @@ const DiscoverPageContent: React.FC<DiscoverPageContentProps> = ({
       height="calc(100vh - 64px)"
       display="flex"
       flexDirection="column"
+      bgcolor="background.paper"
     >
-      <Box
-        bgcolor="background.paper"
-        boxShadow={3}
-        pt={2}
-        pb={1.5}
-        zIndex={1000}
-      >
-        <Container>
-          <Box display="flex">
-            <Box flexGrow={1} mr={1}>
-              <SearchBar
-                criteria={tempCriteria}
-                onChange={setTempCriteria}
-                searchTraces={searchTraces}
-              />
-            </Box>
-            <SearchButton onClick={searchTraces}>Run Query</SearchButton>
-            <SettingsButton
-              onClick={handleSettingsButtonClick}
-              isOpening={isOpeningSettings}
-              data-testid="settings-button"
-            >
-              <SettingsIcon />
-            </SettingsButton>
+      <Box flex="0 0">
+        <Box className={classes.searchRow}>
+          <Box flexGrow={1} mr={1}>
+            <SearchBar
+              criteria={tempCriteria}
+              onChange={setTempCriteria}
+              searchTraces={searchTraces}
+            />
           </Box>
-        </Container>
+          <SearchButton onClick={searchTraces}>
+            <Trans t={t}>Run Query</Trans>
+          </SearchButton>
+          <SettingsButton
+            onClick={handleSettingsButtonClick}
+            isOpening={isOpeningSettings}
+            data-testid="settings-button"
+          >
+            <SettingsIcon />
+          </SettingsButton>
+        </Box>
         <Collapse in={isOpeningSettings}>
-          <Box mt={1.5} mb={1.5}>
+          <Box className={classes.settings}>
             <Divider />
-          </Box>
-          <Container>
-            <Box
-              display="flex"
-              alignItems="center"
-              justifyContent="flex-end"
-              mt={1.75}
-            >
-              <TextField
-                label={<Trans>Limit</Trans>}
-                type="number"
-                variant="outlined"
-                value={tempLimit}
-                onChange={handleLimitChange}
-                size="small"
-                inputProps={{
-                  'data-testid': 'query-limit',
-                }}
-              />
-              <Box ml={1} position="relative">
-                <LookbackButton
-                  onClick={toggleLookbackMenu}
-                  isShowingLookbackMenu={isShowingLookbackMenu}
-                >
-                  {lookbackDisplay}
-                </LookbackButton>
-                {isShowingLookbackMenu && (
-                  <LookbackMenu
-                    close={closeLookbackMenu}
-                    onChange={setTempLookback}
-                    lookback={tempLookback}
-                  />
-                )}
-              </Box>
+            <TextField
+              label={<Trans>Limit</Trans>}
+              type="number"
+              variant="outlined"
+              value={tempLimit}
+              onChange={handleLimitChange}
+              size="small"
+              inputProps={{
+                'data-testid': 'query-limit',
+              }}
+            />
+            <Box ml={1} position="relative">
+              <LookbackButton
+                onClick={toggleLookbackMenu}
+                isShowingLookbackMenu={isShowingLookbackMenu}
+              >
+                {lookbackDisplay}
+              </LookbackButton>
+              {isShowingLookbackMenu && (
+                <LookbackMenu
+                  close={closeLookbackMenu}
+                  onChange={setTempLookback}
+                  lookback={tempLookback}
+                />
+              )}
             </Box>
-          </Container>
+          </Box>
         </Collapse>
         {traceSummaries.length > 0 && (
-          <>
-            <Box mt={1.5} mb={1.5}>
-              <Divider />
-            </Box>
-            <Container>
-              <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Typography variant="h6">
-                  {filteredTraceSummaries.length === 1 ? (
-                    <Trans>1 Result</Trans>
-                  ) : (
-                    <Trans>{filteredTraceSummaries.length} Results</Trans>
-                  )}
-                </Typography>
-
-                <Box display="flex">
-                  <ButtonGroup>
-                    <Button onClick={expandAll}>Expand All</Button>
-                    <Button onClick={collapseAll}>Collapse All</Button>
-                  </ButtonGroup>
-                  <Box width={300} ml={2}>
-                    <Autocomplete
-                      multiple
-                      value={filters}
-                      options={filterOptions}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          variant="outlined"
-                          label="Service filters"
-                          placeholder="Service filters"
-                          size="small"
-                        />
-                      )}
+          <Box className={classes.resultHeader}>
+            <Typography variant="body1">
+              {filteredTraceSummaries.length === 1 ? (
+                <Trans t={t}>1 Result</Trans>
+              ) : (
+                <Trans>{filteredTraceSummaries.length} Results</Trans>
+              )}
+            </Typography>
+            <Box display="flex">
+              <ButtonGroup>
+                <Button onClick={expandAll}>Expand All</Button>
+                <Button onClick={collapseAll}>Collapse All</Button>
+              </ButtonGroup>
+              <Box width={300} ml={2}>
+                <Autocomplete
+                  multiple
+                  value={filters}
+                  options={filterOptions}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      variant="outlined"
+                      label="Service filters"
+                      placeholder="Service filters"
                       size="small"
-                      onChange={handleFiltersChange}
                     />
-                  </Box>
-                </Box>
+                  )}
+                  size="small"
+                  onChange={handleFiltersChange}
+                />
               </Box>
-            </Container>
-          </>
+            </Box>
+          </Box>
         )}
       </Box>
-      <Box flexGrow={1} overflow="auto" pt={3} pb={3}>
-        <Container>{content}</Container>
+      <Box flexGrow={1} overflow="auto">
+        {content}
       </Box>
     </Box>
   );
@@ -724,8 +699,6 @@ const SearchButton = styled(Button).attrs({
   startIcon: <FontAwesomeIcon icon={faSync} />,
 })`
   flex-shrink: 0;
-  height: 60px;
-  min-width: 60px;
   color: ${({ theme }) => theme.palette.common.white};
 `;
 
@@ -739,7 +712,5 @@ const SettingsButton = styled(
   ),
 )`
   flex-shrink: 0;
-  height: 60px;
-  min-width: 0px;
   margin-left: ${({ theme }) => theme.spacing(1)}px;
 `;

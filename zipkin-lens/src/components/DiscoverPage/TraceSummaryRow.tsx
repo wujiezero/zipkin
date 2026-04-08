@@ -1,17 +1,7 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 import {
   Box,
   Collapse,
@@ -27,17 +17,24 @@ import moment from 'moment';
 import React, { useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
-
-import { selectColorByInfoClass } from '../../constants/color';
+import { ErrorOutline as ErrorOutlineIcon } from '@material-ui/icons';
 import TraceSummary from '../../models/TraceSummary';
 import { formatDuration } from '../../util/timestamp';
 import ServiceBadge from '../common/ServiceBadge';
+import { selectColorByInfoClass } from '../../constants/color';
 
 interface TraceSummaryRowProps {
   traceSummary: TraceSummary;
   toggleFilter: (serviceName: string) => void;
   open: boolean;
   toggleOpen: (traceId: string) => void;
+}
+
+function shouldShowIcon(traceSummary: TraceSummary) {
+  return (
+    traceSummary.infoClass === 'trace-error-critical' ||
+    traceSummary.infoClass === 'trace-error-transient'
+  );
 }
 
 const TraceSummaryRow: React.FC<TraceSummaryRowProps> = ({
@@ -70,12 +67,14 @@ const TraceSummaryRow: React.FC<TraceSummaryRowProps> = ({
         </TableCell>
         <TableCell>
           <Box display="flex" alignItems="center">
-            <ServiceNameTypography variant="body1">
-              {traceSummary.root.serviceName}
-            </ServiceNameTypography>
-            <Typography variant="body2" color="textSecondary">
-              {traceSummary.root.spanName}
-            </Typography>
+            {shouldShowIcon(traceSummary) && (
+              <ErrorOutlineIcon
+                style={{ marginRight: '8px' }}
+                fontSize="small"
+                color="error"
+              />
+            )}
+            {`${traceSummary.root.serviceName}: ${traceSummary.root.spanName}`}
           </Box>
         </TableCell>
         <TableCell>
@@ -91,10 +90,11 @@ const TraceSummaryRow: React.FC<TraceSummaryRowProps> = ({
           </Box>
         </TableCell>
         <TableCell align="right">{traceSummary.spanCount}</TableCell>
-        <TableCell align="right">
+        <TableCell align="left">
           <Box
             position="relative"
             width="100%"
+            top="-4px"
             data-testid="TraceSummaryRow-duration"
           >
             {formatDuration(traceSummary.duration)}
@@ -106,7 +106,7 @@ const TraceSummaryRow: React.FC<TraceSummaryRowProps> = ({
         </TableCell>
         <TableCell>
           <Button
-            variant="contained"
+            variant="outlined"
             size="small"
             component={Link}
             to={`traces/${traceSummary.traceId}`}
@@ -119,15 +119,10 @@ const TraceSummaryRow: React.FC<TraceSummaryRowProps> = ({
         <CollapsibleTableCell>
           <Collapse in={open} timeout="auto" unmountOnExit>
             <Box margin={1}>
-              <Box display="flex" alignItems="center">
-                <Typography variant="body1" color="textSecondary">
-                  Trace ID:
-                </Typography>
-                <TraceIdTypography>{traceSummary.traceId}</TraceIdTypography>
-              </Box>
               <BadgesWrapper>
                 {sortedServiceSummaries.map((serviceSummary) => (
                   <ServiceBadge
+                    key={serviceSummary.serviceName}
                     serviceName={serviceSummary.serviceName}
                     count={serviceSummary.spanCount}
                     onClick={toggleFilter}
@@ -150,15 +145,6 @@ const Root = styled(TableRow)`
   }
 `;
 
-const ServiceNameTypography = styled(Typography).attrs({
-  variant: 'body1',
-})`
-  margin-right: ${({ theme }) => theme.spacing(1)}px;
-  &::after {
-    content: ':';
-  }
-`;
-
 const FromNowTypography = styled(Typography).attrs({
   variant: 'body2',
 })`
@@ -169,10 +155,10 @@ const DurationBar = styled.div<{ width: number; infoClass?: string }>`
   position: absolute;
   background-color: ${({ infoClass }) =>
     selectColorByInfoClass(infoClass || '')};
-  opacity: 0.3;
-  top: 0;
+  opacity: 0.9;
+  top: 80%;
   left: 0;
-  height: 100%;
+  height: 50%;
   width: ${({ width }) => width}%;
   border-top-right-radius: 3px;
   border-bottom-right-radius: 3px;
@@ -185,16 +171,8 @@ const CollapsibleTableCell = styled(TableCell).attrs({
   padding-top: 0;
 `;
 
-const TraceIdTypography = styled(Typography).attrs({
-  variant: 'body1',
-})`
-  margin-left: ${({ theme }) => theme.spacing(0.5)}px;
-`;
-
 const BadgesWrapper = styled.div`
   display: flex;
   flex-wrap: wrap;
-  & > * {
-    margin: ${({ theme }) => theme.spacing(0.5)}px;
-  }
+  gap: ${({ theme }) => theme.spacing(0.5)}px;
 `;

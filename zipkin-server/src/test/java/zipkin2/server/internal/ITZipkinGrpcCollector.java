@@ -1,20 +1,12 @@
 /*
- * Copyright 2015-2019 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server.internal;
 
 import com.linecorp.armeria.server.Server;
 import java.io.IOException;
+import java.util.List;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -22,21 +14,17 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import okio.Buffer;
 import okio.BufferedSource;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.junit4.SpringRunner;
 import zipkin.server.ZipkinServer;
 import zipkin2.TestObjects;
 import zipkin2.codec.SpanBytesDecoder;
 import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.proto3.ListOfSpans;
-import zipkin2.proto3.ReportResponse;
 import zipkin2.storage.InMemoryStorage;
 
-import static java.util.Arrays.asList;
 import static okhttp3.Protocol.H2_PRIOR_KNOWLEDGE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -49,31 +37,29 @@ import static zipkin2.server.internal.ITZipkinServer.url;
   properties = {
     "server.port=0",
     "spring.config.name=zipkin-server",
-    "zipkin.collector.grpc.enabled=true"
   }
 )
-@RunWith(SpringRunner.class)
-public class ITZipkinGrpcCollector {
+class ITZipkinGrpcCollector {
   @Autowired InMemoryStorage storage;
   @Autowired Server server;
 
-  @Before public void init() {
+  @BeforeEach void init() {
     storage.clear();
   }
 
-  OkHttpClient client = new OkHttpClient.Builder().protocols(asList(H2_PRIOR_KNOWLEDGE)).build();
+  OkHttpClient client = new OkHttpClient.Builder().protocols(List.of(H2_PRIOR_KNOWLEDGE)).build();
 
-  ListOfSpans request;
+  ListOfSpans grpcRequest;
 
-  @Before public void sanityCheckCodecCompatible() throws IOException {
-    request = ListOfSpans.ADAPTER.decode(SpanBytesEncoder.PROTO3.encodeList(TestObjects.TRACE));
+  @BeforeEach void sanityCheckCodecCompatible() throws IOException {
+    grpcRequest = ListOfSpans.ADAPTER.decode(SpanBytesEncoder.PROTO3.encodeList(TestObjects.TRACE));
 
-    assertThat(SpanBytesDecoder.PROTO3.decodeList(request.encode()))
+    assertThat(SpanBytesDecoder.PROTO3.decodeList(grpcRequest.encode()))
       .containsExactlyElementsOf(TestObjects.TRACE); // sanity check codec compatible
   }
 
-  @Test public void report_trace() throws IOException {
-    callReport(request); // Result is effectively void
+  @Test void report_trace() throws IOException {
+    callReport(grpcRequest); // Result is effectively void
 
     awaitSpans();
 
@@ -81,31 +67,37 @@ public class ITZipkinGrpcCollector {
       .containsExactly(TestObjects.TRACE);
   }
 
-  @Test public void report_emptyIsOk() throws IOException {
-
+  @Test void report_emptyIsOk() throws IOException {
     callReport(new ListOfSpans.Builder().build());
   }
 
-  ReportResponse callReport(ListOfSpans spans) throws IOException {
-    Buffer requestBody = new Buffer();
-    requestBody.writeByte(0 /* compressedFlag */);
-    Buffer encodedMessage = new Buffer();
-    ListOfSpans.ADAPTER.encode(encodedMessage, spans);
-    requestBody.writeInt((int) encodedMessage.size());
-    requestBody.writeAll(encodedMessage);
+  void callReport(ListOfSpans spans) throws IOException {
+    try (Buffer requestBody = new Buffer(); Buffer encodedMessage = new Buffer()) {
+      requestBody.writeByte(0 /* compressedFlag */);
 
-    Response response = client.newCall(new Request.Builder()
-      .url(url(server, "/zipkin.proto3.SpanService/Report"))
-      .addHeader("te", "trailers")
-      .post(RequestBody.create(requestBody.snapshot(), MediaType.get("application/grpc")))
-      .build())
-      .execute();
+      ListOfSpans.ADAPTER.encode(encodedMessage, spans);
+      requestBody.writeInt((int) encodedMessage.size());
+      requestBody.writeAll(encodedMessage);
 
-    BufferedSource responseBody = response.body().source();
-    assertThat((int) responseBody.readByte()).isEqualTo(0); // uncompressed
-    long encodedLength = responseBody.readInt() & 0xffffffffL;
+      Request request = new Request.Builder()
+        .url(url(server, "/zipkin.proto3.SpanService/Report"))
+        .addHeader("te", "trailers")
+        .post(RequestBody.create(requestBody.snapshot(), MediaType.get("application/grpc")))
+        .build();
+      try (Response response = client.newCall(request).execute();
+           BufferedSource responseBody = response.body().source()) {
 
-    return ReportResponse.ADAPTER.decode(responseBody);
+        // We expect this is a valid gRPC over HTTP2 response (Length-Prefixed-Message).
+        // See https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses
+        byte compressedFlag = responseBody.readByte();
+        long messageLength = responseBody.readInt() & 0xffffffffL;
+        assertThat(responseBody.exhausted()).isTrue(); // We expect a single response
+
+        // Now, verify the Length-Prefixed-Message
+        assertThat(compressedFlag).isZero(); // server didn't compress
+        assertThat(messageLength).isZero(); // there are no fields in ReportResponse
+      }
+    }
   }
 
   void awaitSpans() {

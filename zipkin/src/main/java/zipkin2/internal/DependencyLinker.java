@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.internal;
 
@@ -37,8 +28,8 @@ import static java.util.logging.Level.FINE;
 public final class DependencyLinker {
   final Logger logger;
   final SpanNode.Builder builder;
-  final Map<Pair, Long> callCounts = new LinkedHashMap<Pair, Long>();
-  final Map<Pair, Long> errorCounts = new LinkedHashMap<Pair, Long>();
+  final Map<Pair, Long> callCounts = new LinkedHashMap<>();
+  final Map<Pair, Long> errorCounts = new LinkedHashMap<>();
 
   public DependencyLinker() {
     this(Logger.getLogger(DependencyLinker.class.getName()));
@@ -184,12 +175,12 @@ public final class DependencyLinker {
 
   /** links are merged by mapping to parent/child and summing corresponding links */
   public static List<DependencyLink> merge(Iterable<DependencyLink> in) {
-    Map<Pair, Long> callCounts = new LinkedHashMap<Pair, Long>();
-    Map<Pair, Long> errorCounts = new LinkedHashMap<Pair, Long>();
+    Map<Pair, Long> callCounts = new LinkedHashMap<>();
+    Map<Pair, Long> errorCounts = new LinkedHashMap<>();
 
     for (DependencyLink link : in) {
       Pair parentChild = new Pair(link.parent(), link.child());
-      long callCount = callCounts.containsKey(parentChild) ? callCounts.get(parentChild) : 0L;
+      long callCount = callCounts.getOrDefault(parentChild, 0L);
       callCount += link.callCount();
       callCounts.put(parentChild, callCount);
       long errorCount = errorCounts.containsKey(parentChild) ? errorCounts.get(parentChild) : 0L;
@@ -202,14 +193,14 @@ public final class DependencyLinker {
 
   static List<DependencyLink> link(Map<Pair, Long> callCounts,
     Map<Pair, Long> errorCounts) {
-    List<DependencyLink> result = new ArrayList<DependencyLink>(callCounts.size());
+    List<DependencyLink> result = new ArrayList<>(callCounts.size());
     for (Map.Entry<Pair, Long> entry : callCounts.entrySet()) {
       Pair parentChild = entry.getKey();
       result.add(DependencyLink.newBuilder()
         .parent(parentChild.left)
         .child(parentChild.right)
         .callCount(entry.getValue())
-        .errorCount(errorCounts.containsKey(parentChild) ? errorCounts.get(parentChild) : 0L)
+        .errorCount(errorCounts.getOrDefault(parentChild, 0L))
         .build());
     }
     return result;

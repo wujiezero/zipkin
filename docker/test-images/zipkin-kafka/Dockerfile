@@ -1,15 +1,6 @@
 #
-# Copyright 2015-2021 The OpenZipkin Authors
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-# in compliance with the License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License
-# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing permissions and limitations under
-# the License.
+# Copyright The OpenZipkin Authors
+# SPDX-License-Identifier: Apache-2.0
 #
 
 # java_version is used for install and runtime layers of zipkin-kafka
@@ -17,10 +8,10 @@
 # Use latest version here: https://github.com/orgs/openzipkin/packages/container/package/java
 # This is defined in many places because Docker has no "env" script functionality unless you use
 # docker-compose: When updating, update everywhere.
-ARG java_version=15.0.5_p3
+ARG java_version=25.0.2_p10
 
 # We copy files from the context into a scratch container first to avoid a problem where docker and
-# docker-compose don't share layer hashes https://github.com/docker/compose/issues/883 normally.
+# docker compose don't share layer hashes https://github.com/docker/compose/issues/883 normally.
 # COPY --from= works around the issue.
 FROM scratch as scratch
 
@@ -34,7 +25,7 @@ FROM ghcr.io/openzipkin/java:${java_version} as install
 #
 # This is defined in many places because Docker has no "env" script functionality unless you use
 # docker-compose: When updating, update everywhere.
-ARG kafka_version=2.7.0
+ARG kafka_version=3.9.2
 ENV KAFKA_VERSION=$kafka_version
 # Note: Scala 2.13+ supports JRE 14
 ARG scala_version=2.13
@@ -47,7 +38,7 @@ RUN /tmp/install.sh && rm /tmp/install.sh
 # Share the same base image to reduce layers used in testing
 FROM ghcr.io/openzipkin/java:${java_version}-jre as zipkin-kafka
 LABEL org.opencontainers.image.description="Kafka and ZooKeeper on OpenJDK and Alpine Linux"
-ARG kafka_version=2.7.0
+ARG kafka_version=3.9.2
 LABEL kafka-version=$kafka_version
 
 # Add HEALTHCHECK and ENTRYPOINT scripts into the default search path

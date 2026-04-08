@@ -1,31 +1,21 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2;
 
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.io.StreamCorruptedException;
-import java.nio.charset.Charset;
 import java.util.Locale;
 import zipkin2.codec.DependencyLinkBytesDecoder;
 import zipkin2.codec.DependencyLinkBytesEncoder;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /** A dependency link is an edge between two services. */
 //@Immutable
 public final class DependencyLink implements Serializable { // for Spark and Flink jobs
-  static final Charset UTF_8 = Charset.forName("UTF-8"); // pre-Java 1.8
-
   private static final long serialVersionUID = 0L;
 
   public static Builder newBuilder() {
@@ -48,7 +38,7 @@ public final class DependencyLink implements Serializable { // for Spark and Fli
   }
 
   /**
-   * {@linkplan #callCount Count of calls} known to be errors (having one {@linkplain Span#tags()
+   * {@linkplain #callCount Count of calls} known to be errors (having one {@linkplain Span#tags()
    * tag} named "error").
    */
   public long errorCount() {
@@ -103,7 +93,7 @@ public final class DependencyLink implements Serializable { // for Spark and Fli
       String missing = "";
       if (parent == null) missing += " parent";
       if (child == null) missing += " child";
-      if (!"".equals(missing)) throw new IllegalStateException("Missing :" + missing);
+      if (!missing.isEmpty()) throw new IllegalStateException("Missing :" + missing);
       return new DependencyLink(this);
     }
   }
@@ -148,7 +138,7 @@ public final class DependencyLink implements Serializable { // for Spark and Fli
   }
 
   // This is an immutable object, and our encoder is faster than java's: use a serialization proxy.
-  final Object writeReplace() throws ObjectStreamException {
+  Object writeReplace() throws ObjectStreamException {
     return new SerializedForm(DependencyLinkBytesEncoder.JSON_V1.encode(this));
   }
 

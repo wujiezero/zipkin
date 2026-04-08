@@ -1,5 +1,7 @@
-# uses 2.4 so we can use condition: service_healthy
-version: "2.4"
+#
+# Copyright The OpenZipkin Authors
+# SPDX-License-Identifier: Apache-2.0
+#
 
 services:
   zipkin:

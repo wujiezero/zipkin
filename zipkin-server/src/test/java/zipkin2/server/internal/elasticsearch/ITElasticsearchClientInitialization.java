@@ -1,20 +1,11 @@
 /*
- * Copyright 2015-2019 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server.internal.elasticsearch;
 
-import java.io.IOException;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import zipkin2.CheckResult;
@@ -22,7 +13,7 @@ import zipkin2.elasticsearch.ElasticsearchStorage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class ITElasticsearchClientInitialization {
+class ITElasticsearchClientInitialization {
 
   AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
 
@@ -30,7 +21,7 @@ public class ITElasticsearchClientInitialization {
    * This blocks for less than the timeout of 2 second to prove we defer i/o until first use of the
    * storage component.
    */
-  @Test(timeout = 1900L) public void defersIOUntilFirstUse() throws IOException {
+  @Test @Timeout(1900L) void defersIOUntilFirstUse() {
     TestPropertyValues.of(
       "spring.config.name=zipkin-server",
       "zipkin.storage.type:elasticsearch",
@@ -44,7 +35,7 @@ public class ITElasticsearchClientInitialization {
   }
 
   /** blocking a little is ok, but blocking forever is not. */
-  @Test(timeout = 3000L) public void doesntHangWhenAllDown() throws IOException {
+  @Test @Timeout(3000L) void doesntHangWhenAllDown() {
     TestPropertyValues.of(
       "spring.config.name=zipkin-server",
       "zipkin.storage.type:elasticsearch",

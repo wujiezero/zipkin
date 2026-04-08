@@ -14,11 +14,16 @@ We also provide a number images that are not for production, rather to simplify 
 integration tests. We designed these to be small and start easily. We did this by re-using the same
 base layer `openzipkin/zipkin`, and setting up schema where relevant.
 
+* [ghcr.io/openzipkin/zipkin-activemq](test-images/zipkin-activemq/README.md) - runs ActiveMQ Classic
 * [ghcr.io/openzipkin/zipkin-cassandra](test-images/zipkin-cassandra/README.md) - runs Cassandra initialized with Zipkin's schema
-* [ghcr.io/openzipkin/zipkin-elasticsearch6](test-images/zipkin-elasticsearch6/README.md) - runs Elasticsearch 6.x
-* [ghcr.io/openzipkin/zipkin-elasticsearch7](test-images/zipkin-elasticsearch7/README.md) - runs Elasticsearch 7.x
+* [ghcr.io/openzipkin/zipkin-elasticsearch8](test-images/zipkin-elasticsearch8/README.md) - runs Elasticsearch 8.x
+* [ghcr.io/openzipkin/zipkin-elasticsearch9](test-images/zipkin-elasticsearch9/README.md) - runs Elasticsearch 9.x
+* [ghcr.io/openzipkin/zipkin-opensearch2](test-images/zipkin-opensearch2/README.md) - runs OpenSearch 2.x
+* [ghcr.io/openzipkin/zipkin-eureka](test-images/zipkin-eureka/README.md) - runs Eureka
 * [ghcr.io/openzipkin/zipkin-kafka](test-images/zipkin-kafka/README.md) - runs both Kafka+ZooKeeper
 * [ghcr.io/openzipkin/zipkin-mysql](test-images/zipkin-mysql/README.md) - runs MySQL initialized with Zipkin's schema
+* [ghcr.io/openzipkin/zipkin-pulsar](test-images/zipkin-pulsar/README.md) - runs Pulsar
+* [ghcr.io/openzipkin/zipkin-rabbitmq](test-images/zipkin-rabbitmq/README.md) - runs RabbitMQ
 * [ghcr.io/openzipkin/zipkin-ui](test-images/zipkin-ui/README.md) - serves the (Lens) UI directly with NGINX
 
 ## Getting started
@@ -38,7 +43,7 @@ We also provide [example compose files](examples/README.md) that integrate colle
 such as Kafka or Elasticsearch.
 
 ## Configuration
-Configuration is via environment variables, defined by [zipkin-server](https://github.com/openzipkin/zipkin/blob/master/zipkin-server/README.md). Notably, you'll want to look at the `STORAGE_TYPE` environment variables, which
+Configuration is via environment variables, defined by [zipkin-server](../zipkin-server/README.md). Notably, you'll want to look at the `STORAGE_TYPE` environment variables, which
 include "cassandra", "mysql" and "elasticsearch".
 
 Note: the `openzipkin/zipkin-slim` image only supports "elasticsearch" storage. To use other storage types, you must use the main image `openzipkin/zipkin`.
@@ -61,13 +66,13 @@ When in Docker, the following environment variables also apply
   environment variable is typically set by linking a container running
   `zipkin-kafka` as "kafka" when you start the container.
 
-For example, to increase heap size, set `JAVA_OPTS` as shown in our [docker-compose](docker-compose.yml) file:
+For example, to increase heap size, set `JAVA_OPTS` as shown in our [docker-compose](examples/docker-compose.yml) file:
 ```yaml
     environment:
       - JAVA_OPTS=-Xms128m -Xmx128m -XX:+ExitOnOutOfMemoryError
 ```
 
-For example, to add debug logging, set `command` as shown in our [docker-compose](docker-compose.yml) file:
+For example, to add debug logging, set `command` as shown in our [docker-compose](examples/docker-compose.yml) file:
 ```yaml
     command: --logging.level.zipkin2=DEBUG
 ```
@@ -99,7 +104,7 @@ The above is mentioned only for historical reasons. The OpenZipkin community
 do not support Docker's deprecated container links.
 
 ### MySQL
-If using an external MySQL server or image, ensure schema and other parameters match the [docs](https://github.com/openzipkin/zipkin/tree/master/zipkin-storage/mysql-v1#applying-the-schema).
+If using an external MySQL server or image, ensure schema and other parameters match the [docs](../zipkin-storage/mysql-v1/README.md#applying-the-schema).
 
 ## Building images
 

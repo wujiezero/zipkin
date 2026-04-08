@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2019 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server.internal.throttle;
 
@@ -22,18 +13,19 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
-import org.junit.After;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import zipkin2.Call;
 import zipkin2.Callback;
-import zipkin2.reporter.AwaitableCallback;
 
 import static com.linecorp.armeria.common.util.Exceptions.clearTrace;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,7 +40,7 @@ import static zipkin2.server.internal.throttle.ThrottledCall.NOOP_CALLBACK;
 import static zipkin2.server.internal.throttle.ThrottledCall.STORAGE_THROTTLE_MAX_CONCURRENCY;
 import static zipkin2.server.internal.throttle.ThrottledStorageComponent.STORAGE_THROTTLE_MAX_QUEUE_SIZE;
 
-public class ThrottledCallTest {
+class ThrottledCallTest {
   SettableLimit limit = SettableLimit.startingAt(0);
   SimpleLimiter limiter = SimpleLimiter.newBuilder().limit(limit).build();
   LimiterMetrics limiterMetrics = new LimiterMetrics(NoopMeterRegistry.get());
@@ -57,11 +49,11 @@ public class ThrottledCallTest {
   int numThreads = 1;
   ExecutorService executor = Executors.newSingleThreadExecutor();
 
-  @After public void shutdownExecutor() {
+  @AfterEach void shutdownExecutor() {
     executor.shutdown();
   }
 
-  @Test public void niceToString() {
+  @Test void niceToString() {
     Call<Void> delegate = mock(Call.class);
     when(delegate.toString()).thenReturn("StoreSpansCall{}");
 
@@ -69,7 +61,7 @@ public class ThrottledCallTest {
       .hasToString("Throttled(StoreSpansCall{})");
   }
 
-  @Test public void execute_isThrottled() throws Exception {
+  @Test void execute_isThrottled() throws Exception {
     int queueSize = 1;
     int totalTasks = numThreads + queueSize;
     limit.setLimit(totalTasks);
@@ -124,7 +116,7 @@ public class ThrottledCallTest {
     }
   }
 
-  @Test public void execute_throttlesBack_whenStorageRejects() throws Exception {
+  @Test void execute_throttlesBack_whenStorageRejects() throws Exception {
     Listener listener = mock(Listener.class);
     FakeCall call = new FakeCall();
     call.overCapacity = true;
@@ -140,7 +132,7 @@ public class ThrottledCallTest {
     }
   }
 
-  @Test public void execute_ignoresLimit_whenPoolFull() throws Exception {
+  @Test void execute_ignoresLimit_whenPoolFull() throws Exception {
     Listener listener = mock(Listener.class);
 
     ThrottledCall throttle = new ThrottledCall(new FakeCall(), mockExhaustedPool(),
@@ -154,7 +146,7 @@ public class ThrottledCallTest {
     }
   }
 
-  @Test public void enqueue_isThrottled() throws Exception {
+  @Test void enqueue_isThrottled() throws Exception {
     int queueSize = 1;
     int totalTasks = numThreads + queueSize;
     limit.setLimit(totalTasks);
@@ -181,7 +173,7 @@ public class ThrottledCallTest {
       .isEqualTo(STORAGE_THROTTLE_MAX_CONCURRENCY);
   }
 
-  @Test public void enqueue_throttlesBack_whenStorageRejects() {
+  @Test void enqueue_throttlesBack_whenStorageRejects() throws Exception {
     Listener listener = mock(Listener.class);
     FakeCall call = new FakeCall();
     call.overCapacity = true;
@@ -189,15 +181,27 @@ public class ThrottledCallTest {
     ThrottledCall throttle =
       new ThrottledCall(call, executor, mockLimiter(listener), limiterMetrics, isOverCapacity);
 
-    AwaitableCallback callback = new AwaitableCallback();
-    throttle.enqueue(callback);
+    final CountDownLatch countDown = new CountDownLatch(1);
+    final AtomicReference<Throwable> throwable = new AtomicReference<>();
+    throttle.enqueue(new Callback<>() {
+      @Override public void onSuccess(Void value) {
+        countDown.countDown();
+      }
 
-    assertThatThrownBy(callback::await).isEqualTo(OVER_CAPACITY);
+      @Override public void onError(Throwable t) {
+        throwable.set(t);
+        countDown.countDown();
+      }
+    });
+
+    countDown.await();
+
+    assertThat(throwable).hasValue(OVER_CAPACITY);
 
     verify(listener).onDropped();
   }
 
-  @Test public void enqueue_ignoresLimit_whenPoolFull() {
+  @Test void enqueue_ignoresLimit_whenPoolFull() {
     Listener listener = mock(Listener.class);
 
     ThrottledCall throttle = new ThrottledCall(new FakeCall(), mockExhaustedPool(),

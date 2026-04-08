@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.storage.cassandra;
 
@@ -60,13 +51,19 @@ class CassandraSpanStore implements SpanStore, Traces, ServiceAndSpanNames { //n
   @Nullable final SelectTraceIdsFromServiceRemoteService.Factory traceIdsFromServiceRemoteService;
 
   CassandraSpanStore(CassandraStorage storage) {
-    CqlSession session = storage.session();
-    Schema.Metadata metadata = storage.metadata();
-    int maxTraceCols = storage.maxTraceCols;
-    indexFetchMultiplier = storage.indexFetchMultiplier;
-    boolean strictTraceId = storage.strictTraceId;
-    searchEnabled = storage.searchEnabled;
+    this(storage.session(),
+      storage.metadata(),
+      Schema.ensureKeyspaceMetadata(storage.session(), storage.keyspace),
+      storage.maxTraceCols,
+      storage.indexFetchMultiplier,
+      storage.strictTraceId,
+      storage.searchEnabled);
+  }
 
+  CassandraSpanStore(CqlSession session, Schema.Metadata metadata, KeyspaceMetadata keyspace,
+    int maxTraceCols, int indexFetchMultiplier, boolean strictTraceId, boolean searchEnabled) {
+    this.indexFetchMultiplier = indexFetchMultiplier;
+    this.searchEnabled = searchEnabled;
     spans = new SelectFromSpan.Factory(session, strictTraceId, maxTraceCols);
     dependencies = new SelectDependencies.Factory(session);
 
@@ -81,8 +78,7 @@ class CassandraSpanStore implements SpanStore, Traces, ServiceAndSpanNames { //n
       return;
     }
 
-    KeyspaceMetadata md = Schema.ensureKeyspaceMetadata(session, storage.keyspace);
-    indexTtl = KeyspaceMetadataUtil.getDefaultTtl(md, TABLE_TRACE_BY_SERVICE_SPAN);
+    indexTtl = KeyspaceMetadataUtil.getDefaultTtl(keyspace, TABLE_TRACE_BY_SERVICE_SPAN);
     serviceNames = new SelectServiceNames.Factory(session).create();
     if (metadata.hasRemoteService) {
       remoteServiceNames = new SelectRemoteServiceNames.Factory(session);
@@ -106,7 +102,7 @@ class CassandraSpanStore implements SpanStore, Traces, ServiceAndSpanNames { //n
     try {
       return new SelectTraceIdsFromSpan.Factory(session);
     } catch (DriverException ex) {
-      LOG.warn("failed to prepare annotation_query index statements: " + ex.getMessage());
+      LOG.warn("failed to prepare annotation_query index statements: {}", ex.getMessage(), ex);
       return null;
     }
   }
@@ -125,7 +121,7 @@ class CassandraSpanStore implements SpanStore, Traces, ServiceAndSpanNames { //n
   @Override public Call<List<List<Span>>> getTraces(QueryRequest request) {
     if (!searchEnabled) return Call.emptyList();
 
-    TimestampRange timestampRange = timestampRange(request);
+    TimestampRange timestampRange = timestampRange(request, indexTtl);
     // If we have to make multiple queries, over fetch on indexes as they don't return distinct
     // (trace id, timestamp) rows. This mitigates intersection resulting in < limit traces
     final int traceIndexFetchSize = request.limit() * indexFetchMultiplier;
@@ -166,7 +162,7 @@ class CassandraSpanStore implements SpanStore, Traces, ServiceAndSpanNames { //n
    * Creates a call representing one or more queries against {@link Schema#TABLE_TRACE_BY_SERVICE_SPAN}
    * and possibly {@link Schema#TABLE_TRACE_BY_SERVICE_REMOTE_SERVICE}.
    *
-   * <p>The result will be an aggregate if the input requests's serviceName is null, both span name
+   * <p>The result will be an aggregate if the input request serviceName is null, both span name
    * and remote service name are supplied, or there's more than one day of data in the timestamp
    * range.
    *
@@ -226,7 +222,7 @@ class CassandraSpanStore implements SpanStore, Traces, ServiceAndSpanNames { //n
           traceIndexFetchSize));
     }
 
-    if ("".equals(serviceName)) {
+    if (serviceName.isEmpty()) {
       // If we have no service name, we have to lookup service names before running trace ID queries
       Call<List<String>> serviceNames = getServiceNames();
       if (serviceRemoteServices.isEmpty()) {
@@ -305,8 +301,8 @@ class CassandraSpanStore implements SpanStore, Traces, ServiceAndSpanNames { //n
     UUID endUUID;
   }
 
-  TimestampRange timestampRange(QueryRequest request) {
-    long oldestData = Math.max(System.currentTimeMillis() - indexTtl * 1000, 0); // >= 1970
+  TimestampRange timestampRange(QueryRequest request, int indexTtl) {
+    long oldestData = Math.max(System.currentTimeMillis() - indexTtl * 1000L, 0); // >= 1970
     TimestampRange result = new TimestampRange();
     result.startMillis = Math.max((request.endTs() - request.lookback()), oldestData);
     result.startUUID = Uuids.startOf(result.startMillis);

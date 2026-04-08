@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2019 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.storage.mysql.v1;
 
@@ -26,9 +17,11 @@ import static zipkin2.storage.mysql.v1.internal.generated.tables.ZipkinSpans.ZIP
 final class HasRemoteServiceName {
   static final Logger LOG = Logger.getLogger(HasRemoteServiceName.class.getName());
   static final String MESSAGE =
-    "zipkin_spans.remote_service_name doesn't exist, so queries for remote service names will return empty.\n"
-      + "Execute: ALTER TABLE zipkin_spans ADD `remote_service_name` VARCHAR(255);\n"
-      + "ALTER TABLE zipkin_spans ADD INDEX `remote_service_name`;";
+    """
+    zipkin_spans.remote_service_name doesn't exist, so queries for remote service names will return empty.
+    Execute: ALTER TABLE zipkin_spans ADD `remote_service_name` VARCHAR(255);
+    ALTER TABLE zipkin_spans ADD INDEX `remote_service_name`;\
+    """;
 
   static boolean test(DataSource datasource, DSLContexts context) {
     try (Connection conn = datasource.getConnection()) {

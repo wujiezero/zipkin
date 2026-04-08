@@ -1,23 +1,13 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
-import { useLingui } from '@lingui/react';
 import { Button, Menu, MenuItem } from '@material-ui/core';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import TranslateIcon from '@material-ui/icons/Translate';
-import React, { useCallback } from 'react';
-
-import { setLocale } from '../../util/locale';
+import React, { useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { FALLBACK_LOCALE } from '../../translations/i18n';
 
 // We want to display all the languages in native language, not current locale, so hard-code the
 // strings here instead of using internationalization.
@@ -27,25 +17,28 @@ export const LANGUAGES = [
   {
     locale: 'en',
     name: 'English',
+    iso6391: 'EN',
   },
   {
     locale: 'es',
     name: 'Español',
+    iso6391: 'ES',
   },
   {
     locale: 'fr',
     name: 'Français',
+    iso6391: 'FR',
   },
   {
-    locale: 'zh-cn',
+    locale: 'zh_cn',
     name: '中文 (简体)',
+    iso6391: 'ZH',
   },
 ];
 
 const LanguageSelector = () => {
-  const { i18n } = useLingui();
-
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const { i18n } = useTranslation();
 
   const handleButtonClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -59,8 +52,6 @@ const LanguageSelector = () => {
     setAnchorEl(null);
   }, []);
 
-  const currentLocale = i18n.locale;
-
   const handleMenuItemClick = useCallback(
     (event: React.MouseEvent<HTMLLIElement>) => {
       setAnchorEl(null);
@@ -68,14 +59,22 @@ const LanguageSelector = () => {
       if (!locale) {
         return;
       }
-      if (locale === currentLocale) {
+      if (locale === i18n.language) {
         return;
       }
-      setLocale(locale);
-      window.location.reload();
+
+      i18n.changeLanguage(locale);
     },
-    [currentLocale],
+    [i18n],
   );
+
+  useEffect(() => {
+    if (LANGUAGES.find((lang) => lang.locale === i18n.language)) {
+      i18n.changeLanguage(i18n.language);
+    } else {
+      i18n.changeLanguage(FALLBACK_LOCALE); // fallback to default language if the selected language is not supported
+    }
+  }, [i18n]);
 
   return (
     <>
@@ -85,7 +84,7 @@ const LanguageSelector = () => {
         endIcon={<ExpandMoreIcon />}
         data-testid="change-language-button"
       >
-        {LANGUAGES.find((lang) => lang.locale === currentLocale)?.name}
+        {LANGUAGES.find((lang) => lang.locale === i18n.language)?.iso6391}
       </Button>
       <Menu
         anchorEl={anchorEl}
@@ -97,6 +96,7 @@ const LanguageSelector = () => {
           <MenuItem
             key={lang.locale}
             onClick={handleMenuItemClick}
+            selected={lang.locale === i18n.language}
             data-locale={lang.locale}
             data-testid={`language-list-item-${lang.locale}`}
           >

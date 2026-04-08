@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2021 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.elasticsearch;
 
@@ -24,7 +15,6 @@ import com.linecorp.armeria.common.HttpMethod;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -46,9 +36,6 @@ import zipkin2.storage.StorageComponent;
 import zipkin2.storage.Traces;
 
 import static com.linecorp.armeria.common.HttpMethod.GET;
-import static zipkin2.elasticsearch.ElasticsearchVersion.V7_0;
-import static zipkin2.elasticsearch.ElasticsearchVersion.V6_7;
-import static zipkin2.elasticsearch.ElasticsearchVersion.V7_8;
 import static zipkin2.elasticsearch.EnsureIndexTemplate.ensureIndexTemplate;
 import static zipkin2.elasticsearch.VersionSpecificTemplates.TYPE_AUTOCOMPLETE;
 import static zipkin2.elasticsearch.VersionSpecificTemplates.TYPE_DEPENDENCY;
@@ -89,7 +76,7 @@ public abstract class ElasticsearchStorage extends zipkin2.storage.StorageCompon
       .ensureTemplates(true)
       .namesLookback(86400000)
       .flushOnWrites(false)
-      .autocompleteKeys(Collections.emptyList())
+      .autocompleteKeys(List.of())
       .autocompleteTtl((int) TimeUnit.HOURS.toMillis(1))
       .autocompleteCardinality(5 * 4000); // Ex. 5 site tags with cardinality 4000 each
   }
@@ -167,8 +154,8 @@ public abstract class ElasticsearchStorage extends zipkin2.storage.StorageCompon
 
     /**
      * Only valid when the destination is Elasticsearch >= 7.8. Indicates the index template
-     * priority in case of multiple matching templates. The template with highest priority is used.
-     * Default to 0.
+     * priority in case of multiple matching templates. The template with the highest priority is
+     * used. Defaults to 0.
      *
      * <p>See https://www.elastic.co/guide/en/elasticsearch/reference/7.8/_index_template_and_settings_priority.html
      */
@@ -250,17 +237,17 @@ public abstract class ElasticsearchStorage extends zipkin2.storage.StorageCompon
     return new ElasticsearchSpanConsumer(this);
   }
 
-  /** Returns the Elasticsearch version of the connected cluster. Internal use only */
-  @Memoized public ElasticsearchVersion version() {
+  /** Returns the Elasticsearch / OpenSearch version of the connected cluster. Internal use only */
+  @Memoized public BaseVersion version() {
     try {
-      return ElasticsearchVersion.get(http());
+      return BaseVersion.get(http());
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
   }
 
   char indexTypeDelimiter() {
-    return VersionSpecificTemplates.indexTypeDelimiter(version());
+    return VersionSpecificTemplates.forVersion(version()).indexTypeDelimiter();
   }
 
   /** This is an internal blocking call, only used in tests. */
@@ -268,6 +255,8 @@ public abstract class ElasticsearchStorage extends zipkin2.storage.StorageCompon
     Set<String> toClear = new LinkedHashSet<>();
     toClear.add(indexNameFormatter().formatType(TYPE_SPAN));
     toClear.add(indexNameFormatter().formatType(TYPE_DEPENDENCY));
+    // Note: Elasticsearch 8.x requires this config to clear with wildcards:
+    // action.destructive_requires_name: false
     for (String index : toClear) clear(index);
   }
 
@@ -280,7 +269,7 @@ public abstract class ElasticsearchStorage extends zipkin2.storage.StorageCompon
   /**
    * Internal code and api responses coerce to {@link RejectedExecutionException} when work is
    * rejected. We also classify {@link ResponseTimeoutException} as a capacity related exception
-   * eventhough capacity is not the only reason (timeout could also result from a misconfiguration
+   * even though capacity is not the only reason (timeout could also result from a misconfiguration
    * or a network problem).
    */
   @Override public boolean isOverCapacity(Throwable e) {
@@ -313,7 +302,7 @@ public abstract class ElasticsearchStorage extends zipkin2.storage.StorageCompon
       // Unwrap the marker exception as the health check is not relevant for the throttle component.
       // Unwrap any IOException from the first call to ensureIndexTemplates()
       if (e instanceof RejectedExecutionException || e instanceof UncheckedIOException) {
-        e = e.getCause();
+        return CheckResult.failed(e.getCause());
       }
       return CheckResult.failed(e);
     }
@@ -345,35 +334,20 @@ public abstract class ElasticsearchStorage extends zipkin2.storage.StorageCompon
     }
   }
 
-  IndexTemplates versionSpecificTemplates(ElasticsearchVersion version) {
-    return new VersionSpecificTemplates(
+  IndexTemplates versionSpecificTemplates(BaseVersion version) {
+    return VersionSpecificTemplates.forVersion(version).get(
       indexNameFormatter().index(),
       indexReplicas(),
       indexShards(),
       searchEnabled(),
       strictTraceId(),
       templatePriority()
-    ).get(version);
+    );
   }
 
   String buildUrl(IndexTemplates templates, String type) {
     String indexPrefix = indexNameFormatter().index() + templates.indexTypeDelimiter();
-
-    if (version().compareTo(V7_8) >= 0 && templatePriority() != null) {
-      return "/_index_template/" + indexPrefix + type + "_template";
-    }
-    if (version().compareTo(V6_7) >= 0 && version().compareTo(V7_0) < 0) {
-      // because deprecation warning on 6 to prepare for 7:
-      //
-      // [types removal] The parameter include_type_name should be explicitly specified in get
-      // template requests to prepare for 7.0. In 7.0 include_type_name will default to 'false',
-      // which means responses will omit the type name in mapping definitions.
-      //
-      // The parameter include_type_name was added in 6.7. Using this with ES older than
-      // 6.7 will result in unrecognized parameter: [include_type_name].
-      return "/_template/" + indexPrefix + type + "_template?include_type_name=true";
-    }
-    return "/_template/" + indexPrefix + type + "_template";
+    return VersionSpecificTemplates.forVersion(version()).indexTemplatesUrl(indexPrefix, type, templatePriority());
   }
 
   @Override public final String toString() {

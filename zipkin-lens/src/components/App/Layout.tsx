@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 import {
   faProjectDiagram,
@@ -17,8 +8,6 @@ import {
   faQuestionCircle,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { t } from '@lingui/macro';
-import { useLingui } from '@lingui/react';
 import {
   AppBar as MuiAppBar,
   Box,
@@ -32,16 +21,17 @@ import {
 import React from 'react';
 import styled from 'styled-components';
 
+import { useTranslation } from 'react-i18next';
 import HeaderMenuItem from './HeaderMenuItem';
 import LanguageSelector from './LanguageSelector';
+import ThemeSelector from './ThemeSelector';
 import TraceIdSearch from './TraceIdSearch';
 import TraceJsonUploader from './TraceJsonUploader';
 import { useUiConfig } from '../UiConfig';
 import { darkTheme } from '../../constants/color';
-import logoSrc from '../../img/zipkin-logo.png';
 
 const Layout: React.FC = ({ children }) => {
-  const { i18n } = useLingui();
+  const { t } = useTranslation();
   const config = useUiConfig();
 
   return (
@@ -63,20 +53,20 @@ const Layout: React.FC = ({ children }) => {
                 justifyContent="center"
                 alignItems="center"
               >
-                <Logo alt={i18n._(t`Zipkin`)} />
+                <Logo alt={t(`Zipkin`).toString()} />
               </Box>
               <Title>
                 <strong>Zipkin</strong>
               </Title>
               <Box display="flex" ml={3}>
                 <HeaderMenuItem
-                  title={i18n._(t`Find a trace`)}
+                  title={t(`Find a trace`)}
                   path="/"
                   icon={faSearch}
                 />
                 {config.dependency.enabled && (
                   <HeaderMenuItem
-                    title={i18n._(t`Dependencies`)}
+                    title={t(`Dependencies`)}
                     path="/dependency"
                     icon={faProjectDiagram}
                   />
@@ -85,20 +75,23 @@ const Layout: React.FC = ({ children }) => {
             </Box>
             <ThemeProvider theme={darkTheme}>
               <Box display="flex" alignItems="center">
-                <LanguageSelector />
                 <Box mr={2} ml={2}>
                   <TraceJsonUploader />
                 </Box>
                 <TraceIdSearch />
                 {config.supportUrl && (
                   <Box ml={1}>
-                    <Tooltip title={i18n._(t`Support`)}>
+                    <Tooltip title={t(`Support`).toString()}>
                       <MuiIconButton href={config.supportUrl}>
                         <FontAwesomeIcon icon={faQuestionCircle} />
                       </MuiIconButton>
                     </Tooltip>
                   </Box>
                 )}
+                <Box pl={2} ml={2} mr={2} borderLeft={1} borderColor={'#FFF'}>
+                  <LanguageSelector />
+                </Box>
+                <ThemeSelector />
               </Box>
             </ThemeProvider>
           </Box>
@@ -126,7 +119,7 @@ const Toolbar = styled(MuiToolbar)`
 `;
 
 const Logo = styled.img.attrs({
-  src: logoSrc,
+  src: './static/media/zipkin-logo.png',
 })`
   width: 42px;
   height: 42px;

@@ -1,24 +1,13 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.collector.kafka;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -54,7 +43,7 @@ final class KafkaCollectorWorker implements Runnable {
   final CollectorMetrics metrics;
   // added for integration tests only, see ITKafkaCollector
   final AtomicReference<List<TopicPartition>> assignedPartitions =
-      new AtomicReference<>(Collections.emptyList());
+      new AtomicReference<>(List.of());
   final AtomicBoolean running = new AtomicBoolean(true);
 
   KafkaCollectorWorker(KafkaCollector.Builder builder) {
@@ -75,12 +64,12 @@ final class KafkaCollectorWorker implements Runnable {
           public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
             // technically we should remove only the revoked partitions but for test purposes it
             // does not matter
-            assignedPartitions.set(Collections.emptyList());
+            assignedPartitions.set(List.of());
           }
 
           @Override
           public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-            assignedPartitions.set(Collections.unmodifiableList(new ArrayList<>(partitions)));
+            assignedPartitions.set(List.copyOf(partitions));
           }
         });
       LOG.debug("Kafka consumer starting polling loop.");
@@ -106,7 +95,7 @@ final class KafkaCollectorWorker implements Runnable {
                 metrics.incrementMessagesDropped();
                 continue;
               }
-              collector.accept(Collections.singletonList(span), NOOP);
+              collector.accept(List.of(span), NOOP);
             } else {
               collector.acceptSpans(bytes, NOOP);
             }

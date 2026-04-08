@@ -1,19 +1,7 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
-
-/* eslint-disable no-param-reassign */
-
 import {
   SerializedError,
   createAsyncThunk,
@@ -26,12 +14,12 @@ import Span from '../models/Span';
 import TraceSummary from '../models/TraceSummary';
 import { ensureV2TraceData } from '../util/trace';
 
-const {
+import {
   treeCorrectedForClockSkew,
-  traceSummary: buildTraceSummary,
-  traceSummaries: buildTraceSummaries,
-  detailedTraceSummary: buildDetailedTraceSummary,
-} = require('../zipkin');
+  traceSummary as buildTraceSummary,
+  traceSummaries as buildTraceSummaries,
+  detailedTraceSummary as buildDetailedTraceSummary,
+} from '../zipkin';
 
 export const searchTraces = createAsyncThunk(
   'traces/search',
@@ -106,7 +94,9 @@ export const loadTrace = createAsyncThunk(
         return traces[traceId];
       }
       if (skewCorrectedTrace) {
-        adjustedTrace = buildDetailedTraceSummary(skewCorrectedTrace);
+        adjustedTrace = buildDetailedTraceSummary(
+          skewCorrectedTrace,
+        ) as unknown as AdjustedTrace;
         return {
           rawTrace,
           skewCorrectedTrace,
@@ -123,7 +113,7 @@ export const loadTrace = createAsyncThunk(
     const skewCorrectedTrace = treeCorrectedForClockSkew(rawTrace);
     const adjustedTrace: AdjustedTrace = buildDetailedTraceSummary(
       skewCorrectedTrace,
-    );
+    ) as unknown as AdjustedTrace;
     return {
       rawTrace,
       skewCorrectedTrace,
@@ -155,7 +145,7 @@ export const loadJsonTrace = createAsyncThunk(
     const skewCorrectedTrace = treeCorrectedForClockSkew(rawTrace);
     const adjustedTrace: AdjustedTrace = buildDetailedTraceSummary(
       skewCorrectedTrace,
-    );
+    ) as unknown as AdjustedTrace;
     return {
       traceId,
       trace: {

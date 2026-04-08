@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.collector.rabbitmq;
 
@@ -41,7 +32,7 @@ class RabbitMQExtension implements BeforeAllCallback, AfterAllCallback {
     }
 
     container.start();
-    LOGGER.info("Using hostPort " + host() + ":" + port());
+    LOGGER.info("Using hostPort {}:{}", host(), port());
   }
 
   @Override public void afterAll(ExtensionContext context) {
@@ -61,7 +52,7 @@ class RabbitMQExtension implements BeforeAllCallback, AfterAllCallback {
   void declareQueue(String queue) {
     ExecResult result;
     try {
-      result = container.execInContainer("rabbitmqadmin", "declare", "queue", "name=" + queue);
+      result = container.execInContainer("amqp-declare-queue", "-q", queue);
     } catch (Throwable e) {
       propagateIfFatal(e);
       throw new TestAbortedException(
@@ -83,11 +74,8 @@ class RabbitMQExtension implements BeforeAllCallback, AfterAllCallback {
   // mostly waiting for https://github.com/testcontainers/testcontainers-java/issues/3537
   static final class RabbitMQContainer extends GenericContainer<RabbitMQContainer> {
     RabbitMQContainer() {
-      super(parse("ghcr.io/openzipkin/rabbitmq-management-alpine:latest"));
-      if ("true".equals(System.getProperty("docker.skip"))) {
-        throw new TestAbortedException("${docker.skip} == true");
-      }
-      withExposedPorts(RABBIT_PORT); // rabbit's image doesn't expose any port
+      super(parse("ghcr.io/openzipkin/zipkin-rabbitmq:3.6.0"));
+      withExposedPorts(RABBIT_PORT);
       waitStrategy = Wait.forLogMessage(".*Server startup complete.*", 1);
       withStartupTimeout(Duration.ofSeconds(60));
     }

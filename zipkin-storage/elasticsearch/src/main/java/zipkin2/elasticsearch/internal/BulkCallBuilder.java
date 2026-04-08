@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.elasticsearch.internal;
 
@@ -20,6 +11,8 @@ import com.google.auto.value.AutoValue;
 import com.linecorp.armeria.common.HttpData;
 import com.linecorp.armeria.common.HttpHeaderNames;
 import com.linecorp.armeria.common.HttpMethod;
+import com.linecorp.armeria.common.HttpRequest;
+import com.linecorp.armeria.common.HttpRequestWriter;
 import com.linecorp.armeria.common.MediaType;
 import com.linecorp.armeria.common.RequestContext;
 import com.linecorp.armeria.common.RequestHeaders;
@@ -34,14 +27,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Supplier;
+
+import zipkin2.elasticsearch.BaseVersion;
 import zipkin2.elasticsearch.ElasticsearchStorage;
-import zipkin2.elasticsearch.ElasticsearchVersion;
 import zipkin2.elasticsearch.internal.client.HttpCall;
 import zipkin2.elasticsearch.internal.client.HttpCall.BodyConverter;
 
 import static zipkin2.Call.propagateIfFatal;
-import static zipkin2.elasticsearch.ElasticsearchVersion.V7_0;
 import static zipkin2.elasticsearch.internal.JsonSerializers.OBJECT_MAPPER;
+import static zipkin2.elasticsearch.internal.client.HttpCall.maybeRootCauseReason;
 
 // See https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
 // exposed to re-use for testing writes of dependency links
@@ -57,7 +51,7 @@ public final class BulkCallBuilder {
         // only throw when we know it is an error
         if (!root.at("/errors").booleanValue() && !root.at("/error").isObject()) return null;
 
-        String message = root.findPath("reason").textValue();
+        String message = maybeRootCauseReason(root);
         if (message == null) message = contentString.get();
         Number status = root.findPath("status").numberValue();
         if (status != null && status.intValue() == 429) {
@@ -85,9 +79,9 @@ public final class BulkCallBuilder {
   // Mutated for each call to index
   final List<IndexEntry<?>> entries = new ArrayList<>();
 
-  public BulkCallBuilder(ElasticsearchStorage es, ElasticsearchVersion version, String tag) {
+  public BulkCallBuilder(ElasticsearchStorage es, BaseVersion version, String tag) {
     this.tag = tag;
-    shouldAddType = version.compareTo(V7_0) < 0;
+    shouldAddType = version.supportsTypes();
     http = Internal.instance.http(es);
     pipeline = es.pipeline();
     waitForRefresh = es.flushOnWrites();
@@ -112,7 +106,9 @@ public final class BulkCallBuilder {
     entries.add(newIndexEntry(index, typeName, input, writer));
   }
 
-  /** Creates a bulk request when there is more than one object to store */
+  /**
+   * Creates a bulk request when there is more than one object to store
+   */
   public HttpCall<Void> build() {
     QueryStringEncoder urlBuilder = new QueryStringEncoder("/_bulk");
     if (pipeline != null) urlBuilder.addParam("pipeline", pipeline);
@@ -139,7 +135,7 @@ public final class BulkCallBuilder {
 
     BulkRequestSupplier(List<IndexEntry<?>> entries, boolean shouldAddType,
       RequestHeaders headers, ByteBufAllocator alloc) {
-      this.entries = entries;
+      this.entries = List.copyOf(entries);
       this.shouldAddType = shouldAddType;
       this.headers = headers;
       this.alloc = alloc;
@@ -149,13 +145,29 @@ public final class BulkCallBuilder {
       return headers;
     }
 
-    @Override public void writeBody(HttpCall.RequestStream requestStream) {
-      for (IndexEntry<?> entry : entries) {
-        if (!requestStream.tryWrite(HttpData.wrap(serialize(alloc, entry, shouldAddType)))) {
-          // Stream aborted, no need to serialize anymore.
-          return;
-        }
+    @Override public HttpRequest get() {
+      HttpRequestWriter writer = HttpRequest.streaming(headers);
+      writeEntry(writer, 0);
+      return writer;
+    }
+
+    // There's a high chance that the response is received before the request
+    // is complete. This can be a problem for BulkCallBuilder when it's sending
+    // streaming requests. Hence, we use backpressure, instead of buffering.
+    //
+    // Follow https://github.com/line/armeria/issues/3119 for doc updates.
+    private void writeEntry(HttpRequestWriter writer, int index) {
+      if (index == entries.size()) { // out of entries.
+        writer.close();
+        return;
       }
+      // Write the current entry directly to the current request.
+      if (!writer.tryWrite(HttpData.wrap(serialize(alloc, entries.get(index), shouldAddType)))) {
+        // Stream aborted, no need to serialize anymore.
+        return;
+      }
+      // Recurse to proceed to the next entry, if any.
+      writer.whenConsumed().thenRun(() -> writeEntry(writer, index + 1));
     }
   }
 

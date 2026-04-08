@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.elasticsearch;
 
@@ -22,6 +13,7 @@ import com.linecorp.armeria.common.MediaType;
 import com.linecorp.armeria.common.ResponseHeaders;
 import com.linecorp.armeria.testing.junit5.server.mock.MockWebServerExtension;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +25,6 @@ import zipkin2.Span.Kind;
 import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.storage.SpanConsumer;
 
-import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.failBecauseExceptionWasNotThrown;
 import static zipkin2.TestObjects.TODAY;
@@ -53,7 +44,7 @@ class ElasticsearchSpanConsumerTest {
 
   @BeforeEach void setUp() throws Exception {
     storage = ElasticsearchStorage.newBuilder(() -> WebClient.of(server.httpUri()))
-      .autocompleteKeys(asList("environment"))
+      .autocompleteKeys(List.of("environment"))
       .build();
 
     ensureIndexTemplate();
@@ -194,21 +185,21 @@ class ElasticsearchSpanConsumerTest {
 
     assertThat(server.takeRequest().request().contentUtf8()) // put span template
       .contains(
-        ""
-          + "  \"mappings\": {\n"
-          + "    \"span\": {\n"
-          + "      \"properties\": {\n"
-          + "        \"traceId\": { \"type\": \"keyword\", \"norms\": false },\n"
-          + "        \"annotations\": { \"enabled\": false },\n"
-          + "        \"tags\": { \"enabled\": false }\n"
-          + "      }\n"
-          + "    }\n"
-          + "  }\n");
+        """
+          "mappings": {
+            "span": {
+              "properties": {
+                "traceId": { "type": "keyword", "norms": false },
+                "annotations": { "enabled": false },
+                "tags": { "enabled": false }
+              }
+            }
+          }
+        """);
   }
 
   /** Less overhead as a span json isn't rewritten to include a millis timestamp */
-  @Test
-  void searchDisabled_doesntAddTimestampMillis() throws Exception {
+  @Test void searchDisabled_doesntAddTimestampMillis() throws Exception {
     storage.close();
     storage = ElasticsearchStorage.newBuilder(() -> WebClient.of(server.httpUri()))
       .searchEnabled(false)
@@ -219,7 +210,7 @@ class ElasticsearchSpanConsumerTest {
     Span span =
       Span.newBuilder().traceId("20").id("20").name("get").timestamp(TODAY * 1000).build();
 
-    storage.spanConsumer().accept(asList(span)).execute();
+    storage.spanConsumer().accept(List.of(span)).execute();
 
     assertThat(server.takeRequest().request().contentUtf8()).doesNotContain("timestamp_millis");
   }
@@ -230,9 +221,10 @@ class ElasticsearchSpanConsumerTest {
     accept(Span.newBuilder().traceId("1").id("1").timestamp(1).putTag("environment", "A").build());
 
     assertThat(server.takeRequest().request().contentUtf8())
-      .endsWith(""
-        + "{\"index\":{\"_index\":\"zipkin:autocomplete-1970-01-01\",\"_type\":\"autocomplete\",\"_id\":\"environment=A\"}}\n"
-        + "{\"tagKey\":\"environment\",\"tagValue\":\"A\"}\n");
+      .endsWith("""
+        {"index":{"_index":"zipkin:autocomplete-1970-01-01","_type":"autocomplete","_id":"environment=A"}}
+        {"tagKey":"environment","tagValue":"A"}
+        """);
   }
 
   @Test void addsAutocompleteValue_suppressesWhenSameDay() throws Exception {
@@ -260,9 +252,10 @@ class ElasticsearchSpanConsumerTest {
     server.takeRequest(); // skip first
     // different day == different context
     assertThat(server.takeRequest().request().contentUtf8())
-      .endsWith(""
-        + "{\"index\":{\"_index\":\"zipkin:autocomplete-1970-01-02\",\"_type\":\"autocomplete\",\"_id\":\"environment=A\"}}\n"
-        + "{\"tagKey\":\"environment\",\"tagValue\":\"A\"}\n");
+      .endsWith("""
+        {"index":{"_index":"zipkin:autocomplete-1970-01-02","_type":"autocomplete","_id":"environment=A"}}
+        {"tagKey":"environment","tagValue":"A"}
+        """);
   }
 
   @Test void addsAutocompleteValue_revertsSuppressionOnFailure() throws Exception {
@@ -283,6 +276,6 @@ class ElasticsearchSpanConsumerTest {
   }
 
   void accept(Span... spans) throws Exception {
-    spanConsumer.accept(asList(spans)).execute();
+    spanConsumer.accept(List.of(spans)).execute();
   }
 }

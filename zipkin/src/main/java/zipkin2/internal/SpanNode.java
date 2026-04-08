@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.internal;
 
@@ -22,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.logging.Logger;
 import zipkin2.Endpoint;
 import zipkin2.Span;
@@ -49,7 +41,7 @@ public final class SpanNode {
   /** Set via {@link #addChild(SpanNode)} */
   @Nullable SpanNode parent;
   /** Null when a synthetic root node */
-  @Nullable Span span;
+  @Nullable final Span span;
   /** mutable to avoid allocating lists for childless nodes */
   List<SpanNode> children = Collections.emptyList();
 
@@ -78,7 +70,7 @@ public final class SpanNode {
   }
 
   static final class BreadthFirstIterator implements Iterator<SpanNode> {
-    final ArrayDeque<SpanNode> queue = new ArrayDeque<SpanNode>();
+    final ArrayDeque<SpanNode> queue = new ArrayDeque<>();
 
     BreadthFirstIterator(SpanNode root) {
       // since the input data could be headless, we first push onto the queue the root-most spans
@@ -113,7 +105,7 @@ public final class SpanNode {
   SpanNode addChild(SpanNode child) {
     if (child == null) throw new NullPointerException("child == null");
     if (child == this) throw new IllegalArgumentException("circular dependency on " + this);
-    if (children.equals(Collections.emptyList())) children = new ArrayList<SpanNode>();
+    if (children.equals(Collections.emptyList())) children = new ArrayList<>();
     children.add(child);
     child.parent = this;
     return this;
@@ -127,8 +119,8 @@ public final class SpanNode {
     }
 
     SpanNode rootSpan = null;
-    Map<Object, SpanNode> keyToNode = new LinkedHashMap<Object, SpanNode>();
-    Map<Object, Object> spanToParent = new LinkedHashMap<Object, Object>();
+    final Map<Object, SpanNode> keyToNode = new LinkedHashMap<>();
+    final Map<Object, Object> spanToParent = new LinkedHashMap<>();
 
     void clear() {
       rootSpan = null;
@@ -174,7 +166,7 @@ public final class SpanNode {
       }
 
       // At this point, we have the most reliable parent-child relationships and can allocate spans
-      // corresponding the the best place in the trace tree.
+      // corresponding the best place in the trace tree.
       for (Map.Entry<Object, Object> entry : spanToParent.entrySet()) {
         SpanNode child = keyToNode.get(entry.getKey());
         SpanNode parent = keyToNode.get(entry.getValue());
@@ -191,7 +183,7 @@ public final class SpanNode {
 
     /** Sorts children at the same level by {@link Span#timestampAsLong()} ascending */
     void sortTreeByTimestamp(SpanNode root) {
-      ArrayDeque<SpanNode> queue = new ArrayDeque<SpanNode>();
+      ArrayDeque<SpanNode> queue = new ArrayDeque<>();
       queue.add(root);
 
       while (!queue.isEmpty()) {
@@ -316,11 +308,7 @@ public final class SpanNode {
       if (o == this) return true;
       if (!(o instanceof SharedKey)) return false;
       SharedKey that = (SharedKey) o;
-      return id.equals(that.id) && equal(endpoint, that.endpoint);
-    }
-
-    static boolean equal(Object a, Object b) {
-      return a == b || (a != null && a.equals(b));
+      return id.equals(that.id) && Objects.equals(endpoint, that.endpoint);
     }
 
     @Override public int hashCode() {
@@ -334,9 +322,9 @@ public final class SpanNode {
   }
 
   @Override public String toString() {
-    List<Span> childrenSpans = new ArrayList<Span>();
-    for (int i = 0, length = children.size(); i < length; i++) {
-      childrenSpans.add(children.get(i).span);
+    List<Span> childrenSpans = new ArrayList<>();
+    for (SpanNode child : children) {
+      childrenSpans.add(child.span);
     }
     return "SpanNode{parent=" + (parent != null ? parent.span : null)
       + ", span=" + span + ", children=" + childrenSpans + "}";

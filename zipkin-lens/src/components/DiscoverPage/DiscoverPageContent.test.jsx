@@ -1,26 +1,16 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
-
-/* eslint-disable react/prop-types */
-
-import { fireEvent } from '@testing-library/react';
-import { act, renderHook } from '@testing-library/react-hooks';
+import { describe, it, expect, afterEach } from 'vitest';
+import { fireEvent, cleanup, screen } from '@testing-library/react';
 import { createMemoryHistory } from 'history';
 import moment from 'moment';
 import React from 'react';
 import { Router } from 'react-router-dom';
 
+import { renderHook } from '@testing-library/react-hooks/lib/pure';
+import { act } from 'react-dom/test-utils';
 import DiscoverPageContent, {
   buildApiQuery,
   parseDuration,
@@ -216,46 +206,39 @@ describe('buildApiQuery', () => {
 });
 
 describe('<DiscoverPageContent />', () => {
+  afterEach(cleanup);
+
   it('should initialize fixed lookback using config.json', () => {
-    const { getAllByText, getByTestId, rerender } = render(
-      <DiscoverPageContent />,
-      {
-        uiConfig: {
-          defaultLookback: 60 * 1000 * 5, // 5m
-        },
+    const { rerender } = render(<DiscoverPageContent />, {
+      uiConfig: {
+        defaultLookback: 60 * 1000 * 5, // 5m
       },
-    );
-    fireEvent.click(getByTestId('settings-button')); // Open settings
+    });
+    fireEvent.click(screen.getByTestId('settings-button')); // Open settings
     rerender(<DiscoverPageContent />);
-    expect(getAllByText('Last 5 minutes').length).toBe(1);
+    expect(screen.getAllByText('Last 5 minutes').length).toBe(1);
   });
 
   it('should initialze millis lookback using config.json', () => {
-    const { getAllByText, getByTestId, rerender } = render(
-      <DiscoverPageContent />,
-      {
-        uiConfig: {
-          defaultLookback: 12345,
-        },
+    const { rerender } = render(<DiscoverPageContent />, {
+      uiConfig: {
+        defaultLookback: 12345,
       },
-    );
-    fireEvent.click(getByTestId('settings-button')); // Open settings
+    });
+    fireEvent.click(screen.getByTestId('settings-button')); // Open settings
     rerender(<DiscoverPageContent />);
-    expect(getAllByText('12345ms').length).toBe(1);
+    expect(screen.getAllByText('12345ms').length).toBe(1);
   });
 
   it('should initialize the query limit using config.json', () => {
-    const { getAllByTestId, getByTestId, rerender } = render(
-      <DiscoverPageContent />,
-      {
-        uiConfig: {
-          queryLimit: 30,
-        },
+    const { rerender } = render(<DiscoverPageContent />, {
+      uiConfig: {
+        queryLimit: 30,
       },
-    );
-    fireEvent.click(getByTestId('settings-button')); // Open settings
+    });
+    fireEvent.click(screen.getByTestId('settings-button')); // Open settings
     rerender(<DiscoverPageContent />);
-    const items = getAllByTestId('query-limit');
+    const items = screen.getAllByTestId('query-limit');
     expect(items.length).toBe(1);
     expect(items[0].value).toBe('30');
   });

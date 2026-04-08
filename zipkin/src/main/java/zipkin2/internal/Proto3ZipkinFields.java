@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2019 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.internal;
 
@@ -60,8 +51,8 @@ final class Proto3ZipkinFields {
     @Override int sizeOfValue(Endpoint value) {
       int result = 0;
       result += SERVICE_NAME.sizeInBytes(value.serviceName());
-      result += IPV4.sizeInBytes(value.ipv4Bytes());
-      result += IPV6.sizeInBytes(value.ipv6Bytes());
+      if (value.ipv4Bytes() != null) result += 6; // tag + size of 4 + 4 bytes
+      if (value.ipv6Bytes() != null) result += 18; // tag + size of 16 + 16 bytes
       result += PORT.sizeInBytes(value.portAsInt());
       return result;
     }
@@ -255,9 +246,8 @@ final class Proto3ZipkinFields {
       sizeOfSpan += REMOTE_ENDPOINT.sizeInBytes(span.remoteEndpoint());
 
       List<Annotation> annotations = span.annotations();
-      int annotationCount = annotations.size();
-      for (int i = 0; i < annotationCount; i++) {
-        sizeOfSpan += ANNOTATION.sizeInBytes(annotations.get(i));
+      for (Annotation annotation : annotations) {
+        sizeOfSpan += ANNOTATION.sizeInBytes(annotation);
       }
 
       Map<String, String> tags = span.tags();
@@ -285,9 +275,8 @@ final class Proto3ZipkinFields {
       REMOTE_ENDPOINT.write(b, value.remoteEndpoint());
 
       List<Annotation> annotations = value.annotations();
-      int annotationLength = annotations.size();
-      for (int i = 0; i < annotationLength; i++) {
-        ANNOTATION.write(b, annotations.get(i));
+      for (Annotation annotation : annotations) {
+        ANNOTATION.write(b, annotation);
       }
 
       Map<String, String> tags = value.tags();

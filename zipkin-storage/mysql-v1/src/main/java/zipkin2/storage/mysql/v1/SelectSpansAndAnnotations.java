@@ -1,21 +1,11 @@
 /*
- * Copyright 2015-2019 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.storage.mysql.v1;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,7 +32,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.groupingBy;
 import static org.jooq.impl.DSL.max;
 import static org.jooq.impl.DSL.row;
-import static zipkin2.internal.HexCodec.lowerHexToUnsignedLong;
 import static zipkin2.storage.mysql.v1.Schema.maybeGet;
 import static zipkin2.storage.mysql.v1.SelectAnnotationServiceNames.localServiceNameCondition;
 import static zipkin2.storage.mysql.v1.internal.generated.tables.ZipkinAnnotations.ZIPKIN_ANNOTATIONS;
@@ -233,22 +222,22 @@ abstract class SelectSpansAndAnnotations implements Function<DSLContext, List<Sp
       .where(ZIPKIN_SPANS.START_TS.between(endTs - request.lookback() * 1000, endTs));
 
     if (request.serviceName() != null) {
-      dsl.and(localServiceNameCondition()
+      dsl = dsl.and(localServiceNameCondition()
         .and(ZIPKIN_ANNOTATIONS.ENDPOINT_SERVICE_NAME.eq(request.serviceName())));
     }
 
     if (request.remoteServiceName() != null) {
-      dsl.and(ZIPKIN_SPANS.REMOTE_SERVICE_NAME.eq(request.remoteServiceName()));
+      dsl = dsl.and(ZIPKIN_SPANS.REMOTE_SERVICE_NAME.eq(request.remoteServiceName()));
     }
 
     if (request.spanName() != null) {
-      dsl.and(ZIPKIN_SPANS.NAME.eq(request.spanName()));
+      dsl = dsl.and(ZIPKIN_SPANS.NAME.eq(request.spanName()));
     }
 
     if (request.minDuration() != null && request.maxDuration() != null) {
-      dsl.and(ZIPKIN_SPANS.DURATION.between(request.minDuration(), request.maxDuration()));
+      dsl = dsl.and(ZIPKIN_SPANS.DURATION.between(request.minDuration(), request.maxDuration()));
     } else if (request.minDuration() != null) {
-      dsl.and(ZIPKIN_SPANS.DURATION.greaterOrEqual(request.minDuration()));
+      dsl = dsl.and(ZIPKIN_SPANS.DURATION.greaterOrEqual(request.minDuration()));
     }
     return dsl.groupBy(schema.spanIdFields)
       .orderBy(max(ZIPKIN_SPANS.START_TS).desc())

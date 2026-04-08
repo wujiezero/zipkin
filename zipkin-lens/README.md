@@ -2,7 +2,7 @@
 
 Zipkin-lens is the UI for [Zipkin](https://github.com/openzipkin/zipkin). It is a modern replacement of the [classic](https://github.com/openzipkin-attic/zipkin-classic) UI which has proved its merit since the beginning of the Zipkin project.
 
-Here are a couple example screen shots:
+Here are a couple example screenshots:
 
 <img width="1920" alt="Search Screen" src="https://user-images.githubusercontent.com/64215/49579677-4602de00-f990-11e8-81b7-dd782ce91227.png">
 <img width="1920" alt="Trace Detail Screen" src="https://user-images.githubusercontent.com/64215/49579684-4d29ec00-f990-11e8-8799-5c53a503413e.png">
@@ -34,10 +34,29 @@ To get a coverage report as well, run `npm test -- --coverage`.
 Builds the app for production to the `build` folder.<br />
 It correctly bundles React in production mode and optimizes the build for the best performance.
 
+## Build tips
+
+### Maven build
+
+This project is not published to NPM, rather Maven, as the primary consumer is [zipkin-server](../zipkin-server).
+`../mvnw clean install` installs and builds via NPM. The resulting assets, such as index.html, are
+placed into the "zipkin-lens" directory of zipkin-lens.jar. This is published on release as
+[io.zipkin:zipkin-lens](https://central.sonatype.com/search?q=io.zipkin%3Azipkin-lens).
+
+### Use the production node version
+
+The production UI is built with Maven. To use the same version, issue this command:
+
+```bash
+nvm use $(../mvnw help:evaluate -Dexpression=node.version -q -DforceStdout)
+```
+
+Now, it is less likely a pull request will fail when `npm test` succeeds locally.
+
 ## Localization
 
 We use [LinguiJS](https://lingui.js.org/) for localization of the UI. Translations for strings are
-found in the JSON files under [here](./src/translations). The Javascript files in the directory are
+found in the JSON files under [here](src/translations). The Javascript files in the directory are
 compiled from the JSON files. We're always excited to have help maintaining these translations - if
 you see a string in the UI that is not translated or mistranslated, please feel free to send a PR to
 the JSON file to fix it. If you can, please run `yarn run compile` to also compile the translation
@@ -46,13 +65,13 @@ of it.
 
 ### Adding a new locale
 
-To add a new translated locale, first edit [.linguirc](./.linguirc) and add the locale to the
+To add a new translated locale, first edit [.linguirc](.linguirc) and add the locale to the
 `locales` section. Next, run `yarn run extract` to extract a new file under `src/translations` for
 the locale. Translate as many strings in the JSON file as you can. Then run `yarn run compile` to
 compile the strings.
 
-Finally, edit [App.jsx](./src/components/App/App.jsx) and
-[LanguageSelector.tsx](./src/components/App/LanguageSelector.tsx) to import the new translation and
+Finally, edit [App.tsx](src/components/App/App.tsx) and
+[LanguageSelector.tsx](src/components/App/LanguageSelector.tsx) to import the new translation and
 add an entry to the language selector respectively.
 
 ## Dev Tools
@@ -63,34 +82,39 @@ need to debug the page (they will only work with the local dev server, not a pro
 
 ### React Developer Tools
 
-Chrome: https://chrome.google.com/webstore/detail/react-developer-tools/fmkadmapgofadopljbjfkapdkoienihi
+Chrome: https://chromewebstore.google.com/detail/react-developer-tools/fmkadmapgofadopljbjfkapdkoienihi
 Firefox: https://addons.mozilla.org/en-US/firefox/addon/react-devtools/
 
 ### Redux DevTools
 
-Chrome: https://chrome.google.com/webstore/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd
+Chrome: https://chromewebstore.google.com/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd
 Firefox: https://addons.mozilla.org/en-US/firefox/addon/reduxdevtools/
 
 ## Running behind a reverse proxy
 Since version `2.20`, Zipkin Lens supports running under an arbitrary context root. As a result,
-it can be proxied under a different path than `/zipkin/` such as `/proxy/foo/myzipkin/`.
+it can be proxied under a different path than `/zipkin` such as `/admin/zipkin`.
 
-As an example, here is the configuration for Apache HTTPD acting as a reverse proxy
+As an example, here is the configuration for Apache HTTP Server acting as a reverse proxy
 for a Zipkin instance running on the same host:
 
 ```
 LoadModule proxy_module lib/httpd/modules/mod_proxy.so
 LoadModule proxy_http_module lib/httpd/modules/mod_proxy_http.so
 
-ProxyPass "/proxy/foo/myzipkin"  "http://localhost:9411/zipkin/"
-ProxyPassReverse "/proxy/foo/myzipkin"  "http://localhost:9411/zipkin/"
+ProxyPass "/admin/zipkin"  "http://localhost:9411/zipkin"
+ProxyPassReverse "/admin/zipkin"  "http://localhost:9411/zipkin"
 ```
 
 For the reverse proxy configuration to work, Zipkin needs to be started with the `zipkin.ui.basepath`
 parameter pointing to the proxy path:
 
+```bash
+java -jar zipkin.jar --zipkin.ui.basepath=/admin/zipkin
 ```
-java -jar zipkin.jar --zipkin.ui.basepath=/proxy/foo/myzipkin
+
+or via docker
+```bash
+docker run -e ZIPKIN_UI_BASEPATH=/admin/zipkin -p 9411:9411 openzipkin/zipkin
 ```
 
 ## Authentication / Authorization

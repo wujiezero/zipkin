@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.storage.cassandra;
 
@@ -17,10 +8,11 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.extension.RegisterExtension;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import zipkin2.Span;
 import zipkin2.storage.QueryRequest;
 
@@ -35,15 +27,16 @@ import static zipkin2.storage.cassandra.InternalForTests.writeDependencyLinks;
 /**
  * Large amounts of writes can make other tests flake. This can happen for reasons such as
  * overloading the test Cassandra container or knock-on effects of tombstones left from {@link
- * CassandraStorageExtension#clear(CassandraStorage)}.
+ * CassandraContainer#clear(CassandraStorage)}.
  *
  * <p>Tests here share a different Cassandra container and each method runs in an isolated
  * keyspace. As schema installation takes ~10s, hesitate adding too many tests here.
  */
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Testcontainers
+@Tag("docker")
 class ITCassandraStorageHeavy {
 
-  @RegisterExtension CassandraStorageExtension backend = new CassandraStorageExtension();
+  @Container static CassandraContainer backend = new CassandraContainer();
 
   @Nested
   class ITSpanStoreHeavy extends zipkin2.storage.ITSpanStoreHeavy<CassandraStorage> {
@@ -52,7 +45,7 @@ class ITCassandraStorageHeavy {
     }
 
     @Override protected void blockWhileInFlight() {
-      CassandraStorageExtension.blockWhileInFlight(storage);
+      CassandraContainer.blockWhileInFlight(storage);
     }
 
     @Override public void clear() {
@@ -86,7 +79,7 @@ class ITCassandraStorageHeavy {
         .execute("SELECT COUNT(*) from trace_by_service_span")
         .one()
         .getLong(0))
-        .isGreaterThan(traceCount * localServiceCount);
+        .isGreaterThan((long) traceCount * localServiceCount);
 
       // Implementation over-fetches on the index to allow the user to receive unsurprising results.
       QueryRequest request = requestBuilder()
@@ -105,7 +98,7 @@ class ITCassandraStorageHeavy {
     }
 
     @Override protected void blockWhileInFlight() {
-      CassandraStorageExtension.blockWhileInFlight(storage);
+      CassandraContainer.blockWhileInFlight(storage);
     }
 
     @Override public void clear() {
@@ -135,7 +128,7 @@ class ITCassandraStorageHeavy {
     }
 
     @Override protected void blockWhileInFlight() {
-      CassandraStorageExtension.blockWhileInFlight(storage);
+      CassandraContainer.blockWhileInFlight(storage);
     }
 
     @Override public void clear() {

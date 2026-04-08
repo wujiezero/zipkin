@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2021 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server;
 
@@ -20,7 +11,6 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -91,7 +81,7 @@ class ServerIntegratedBenchmark {
 
   @Test void elasticsearch() throws Exception {
     GenericContainer<?> elasticsearch =
-      new GenericContainer<>(parse("ghcr.io/openzipkin/zipkin-elasticsearch7:2.23.2"))
+      new GenericContainer<>(parse("ghcr.io/openzipkin/zipkin-elasticsearch9:3.6.0"))
         .withNetwork(Network.SHARED)
         .withNetworkAliases("elasticsearch")
         .withLabel("name", "elasticsearch")
@@ -105,7 +95,7 @@ class ServerIntegratedBenchmark {
 
   @Test void cassandra3() throws Exception {
     GenericContainer<?> cassandra =
-      new GenericContainer<>(parse("ghcr.io/openzipkin/zipkin-cassandra:2.23.2"))
+      new GenericContainer<>(parse("ghcr.io/openzipkin/zipkin-cassandra:3.6.0"))
         .withNetwork(Network.SHARED)
         .withNetworkAliases("cassandra")
         .withLabel("name", "cassandra")
@@ -119,7 +109,7 @@ class ServerIntegratedBenchmark {
 
   @Test void mysql() throws Exception {
     GenericContainer<?> mysql =
-      new GenericContainer<>(parse("ghcr.io/openzipkin/zipkin-mysql:2.23.2"))
+      new GenericContainer<>(parse("ghcr.io/openzipkin/zipkin-mysql:3.6.0"))
         .withNetwork(Network.SHARED)
         .withNetworkAliases("mysql")
         .withLabel("name", "mysql")
@@ -157,7 +147,7 @@ class ServerIntegratedBenchmark {
     // Use a quay.io mirror to prevent build outages due to Docker Hub pull quotas
     // Use same version as in docker/examples/docker-compose-prometheus.yml
     GenericContainer<?> prometheus =
-      new GenericContainer<>(parse("quay.io/prometheus/prometheus:v2.23.0"))
+      new GenericContainer<>(parse("quay.io/prometheus/prometheus:v3.10.0"))
         .withNetwork(Network.SHARED)
         .withNetworkAliases("prometheus")
         .withExposedPorts(9090)
@@ -167,7 +157,7 @@ class ServerIntegratedBenchmark {
 
     // Use a quay.io mirror to prevent build outages due to Docker Hub pull quotas
     // Use same version as in docker/examples/docker-compose-prometheus.yml
-    GenericContainer<?> grafana = new GenericContainer<>(parse("quay.io/app-sre/grafana:7.3.4"))
+    GenericContainer<?> grafana = new GenericContainer<>(parse("quay.io/giantswarm/grafana:11.6.7"))
       .withNetwork(Network.SHARED)
       .withNetworkAliases("grafana")
       .withExposedPorts(3000)
@@ -175,11 +165,11 @@ class ServerIntegratedBenchmark {
       .withEnv("GF_AUTH_ANONYMOUS_ORG_ROLE", "Admin");
     containers.add(grafana);
 
-    // This is an arbitrary small image that has curl installed
-    // Use a quay.io mirror to prevent build outages due to Docker Hub pull quotas
+    // This is a small Alpine-based image from the official curl project
+    // Use latest from https://quay.io/repository/curl/curl-base?tab=tags
     // Use same version as in docker/examples/docker-compose-prometheus.yml
     GenericContainer<?> grafanaDashboards =
-      new GenericContainer<>(parse("quay.io/rackspace/curl:7.70.0"))
+      new GenericContainer<>(parse("quay.io/curl/curl-base:8.18.0"))
         .withNetwork(Network.SHARED)
         .withWorkingDirectory("/tmp")
         .withLogConsumer(new Slf4jLogConsumer(LOG))
@@ -221,31 +211,36 @@ class ServerIntegratedBenchmark {
     System.out.println(wrk.getLogs().replace("\n\n", "\n"));
 
     WebClient prometheusClient = WebClient.of(
-      "h1c://" + prometheus.getContainerIpAddress() + ":" + prometheus.getFirstMappedPort());
+      "h1c://" + prometheus.getHost() + ":" + prometheus.getFirstMappedPort());
 
-    System.out.println(String.format("Messages received: %s", prometheusValue(
-      prometheusClient, "sum(zipkin_collector_messages_total)")));
-    System.out.println(String.format("Spans received: %s", prometheusValue(
-      prometheusClient, "sum(zipkin_collector_spans_total)")));
-    System.out.println(String.format("Spans dropped: %s", prometheusValue(
-      prometheusClient, "sum(zipkin_collector_spans_dropped_total)")));
+    System.out.printf("Messages received: %s%n", prometheusValue(
+      prometheusClient, "sum(zipkin_collector_messages_total)"));
+    System.out.printf("Spans received: %s%n", prometheusValue(
+      prometheusClient, "sum(zipkin_collector_spans_total)"));
+    System.out.printf("Spans dropped: %s%n", prometheusValue(
+      prometheusClient, "sum(zipkin_collector_spans_dropped_total)"));
 
     System.out.println("Memory quantiles:");
     printQuartiles(prometheusClient, "jvm_memory_used_bytes{area=\"heap\"}");
     printQuartiles(prometheusClient, "jvm_memory_used_bytes{area=\"nonheap\"}");
 
-    System.out.println(String.format("Total GC time (s): %s",
-      prometheusValue(prometheusClient, "sum(jvm_gc_pause_seconds_sum)")));
-    System.out.println(String.format("Number of GCs: %s",
-      prometheusValue(prometheusClient, "sum(jvm_gc_pause_seconds_count)")));
+    System.out.printf(
+      "Total GC time (s): %s%n",
+      prometheusValue(prometheusClient, "sum(jvm_gc_pause_seconds_sum)"));
+    System.out.printf(
+      "Number of GCs: %s%n", prometheusValue(prometheusClient, "sum(jvm_gc_pause_seconds_count)"));
 
     System.out.println("POST Spans latency (s)");
-    printHistogram(prometheusClient, "http_server_requests_seconds_bucket{"
-      + "method=\"POST\",status=\"202\",uri=\"/api/v2/spans\"}");
+    printHistogram(prometheusClient, """
+      http_server_requests_seconds_bucket{
+      method="POST",status="202",uri="/api/v2/spans"}
+      """);
 
     if (WAIT_AFTER_BENCHMARK) {
-      System.out.println("Keeping containers running until explicit termination. "
-        + "Feel free to poke around in grafana.");
+      System.out.println("""
+        Keeping containers running until explicit termination. \
+        Feel free to poke around in grafana.\
+        """);
       Thread.sleep(Long.MAX_VALUE);
     }
   }
@@ -282,7 +277,7 @@ class ServerIntegratedBenchmark {
 
     final GenericContainer<?> zipkin;
     if (RELEASE_VERSION == null) {
-      zipkin = new GenericContainer<>(parse("ghcr.io/openzipkin/java:15.0.4_p5"));
+      zipkin = new GenericContainer<>(parse("ghcr.io/openzipkin/java:25.0.2_p10"));
       List<String> classpath = new ArrayList<>();
       for (String item : System.getProperty("java.class.path").split(File.pathSeparator)) {
         Path path = Paths.get(item);
@@ -321,25 +316,24 @@ class ServerIntegratedBenchmark {
       .withNetworkAliases("zipkin")
       .withExposedPorts(9411)
       .withEnv(env)
-      .waitingFor(Wait.forHealthcheck());
+      .waitingFor(Wait.forHttp("/health"));
     containers.add(zipkin);
     return zipkin;
   }
 
   static void printContainerMapping(GenericContainer<?> container) {
-    System.out.println(String.format(
-      "Container %s ports exposed at %s",
-      container.getDockerImageName(),
+    System.out.printf(
+      "Container %s ports exposed at %s%n", container.getDockerImageName(),
       container.getExposedPorts().stream()
-        .map(port -> new SimpleImmutableEntry<>(port,
-          "http://" + container.getContainerIpAddress() + ":" + container.getMappedPort(port)))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))));
+        .map(port -> Map.entry(port,
+          "http://" + container.getHost() + ":" + container.getMappedPort(port)))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
   }
 
   static void printQuartiles(WebClient prometheus, String metric) throws Exception {
     for (double quantile : Arrays.asList(0.0, 0.25, 0.5, 0.75, 1.0)) {
       String value = prometheusValue(prometheus, "quantile(" + quantile + ", " + metric + ")");
-      System.out.println(String.format("%s[%s] = %s", metric, quantile, value));
+      System.out.printf("%s[%s] = %s%n", metric, quantile, value);
     }
   }
 
@@ -347,7 +341,7 @@ class ServerIntegratedBenchmark {
     for (double quantile : Arrays.asList(0.5, 0.9, 0.99)) {
       String value =
         prometheusValue(prometheus, "histogram_quantile(" + quantile + ", " + metric + ")");
-      System.out.println(String.format("%s[%s] = %s", metric, quantile, value));
+      System.out.printf("%s[%s] = %s%n", metric, quantile, value);
     }
   }
 

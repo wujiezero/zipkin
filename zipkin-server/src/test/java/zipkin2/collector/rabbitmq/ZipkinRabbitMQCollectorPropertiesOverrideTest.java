@@ -1,53 +1,35 @@
 /*
- * Copyright 2015-2019 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.collector.rabbitmq;
 
 import java.net.URI;
-import java.util.Arrays;
+import java.util.List;
 import java.util.function.Function;
-import org.junit.After;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import zipkin2.server.internal.rabbitmq.Access;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@RunWith(Parameterized.class)
 public class ZipkinRabbitMQCollectorPropertiesOverrideTest {
 
   AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
 
-  @After
-  public void close() {
+  @AfterEach void close() {
     if (context != null) context.close();
   }
 
-  @Parameterized.Parameter(0)
   public String property;
-
-  @Parameterized.Parameter(1)
   public Object value;
-
-  @Parameterized.Parameter(2)
   public Function<RabbitMQCollector.Builder, Object> builderExtractor;
 
-  @Parameterized.Parameters(name = "{0}")
   public static Iterable<Object[]> data() {
-    return Arrays.asList(
+    return List.of(
         // intentionally punting on comma-separated form of a list of addresses as it doesn't fit
         // this unit test. Better to make a separate one than force-fit!
         parameters("addresses", "localhost:5671", builder -> builder.addresses[0].toString()),
@@ -73,8 +55,11 @@ public class ZipkinRabbitMQCollectorPropertiesOverrideTest {
     return new Object[] {"zipkin.collector.rabbitmq." + propertySuffix, value, builderExtractor};
   }
 
-  @Test
-  public void propertyTransferredToCollectorBuilder() throws Exception {
+  @MethodSource("data")
+  @ParameterizedTest(name = "{0}")
+  void propertyTransferredToCollectorBuilder(String property, Object value,
+    Function<RabbitMQCollector.Builder, Object> builderExtractor) throws Exception {
+    initZipkinRabbitMQCollectorPropertiesOverrideTest(property, value, builderExtractor);
     TestPropertyValues.of(property + ":" + value).applyTo(context);
     Access.registerRabbitMQProperties(context);
     context.refresh();
@@ -82,5 +67,12 @@ public class ZipkinRabbitMQCollectorPropertiesOverrideTest {
     assertThat(Access.collectorBuilder(context))
         .extracting(builderExtractor)
         .isEqualTo(value);
+  }
+
+  void initZipkinRabbitMQCollectorPropertiesOverrideTest(String property, Object value,
+    Function<RabbitMQCollector.Builder, Object> builderExtractor) {
+    this.property = property;
+    this.value = value;
+    this.builderExtractor = builderExtractor;
   }
 }

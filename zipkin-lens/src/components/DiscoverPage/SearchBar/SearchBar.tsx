@@ -1,17 +1,7 @@
 /*
- * Copyright 2015-2021 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 /* eslint-disable no-shadow */
 
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
@@ -26,20 +16,30 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { connect } from 'react-redux';
 import { ThunkDispatch } from 'redux-thunk';
-
-import Criterion, { newCriterion } from '../Criterion';
-import CriterionBox from './CriterionBox';
 import { loadAutocompleteValues } from '../../../slices/autocompleteValuesSlice';
 import { loadRemoteServices } from '../../../slices/remoteServicesSlice';
 import { loadSpans } from '../../../slices/spansSlice';
 import { RootState } from '../../../store';
+import Criterion, { newCriterion } from '../Criterion';
+import { CRITERION_BOX_HEIGHT } from './constants';
+import CriterionBox from './CriterionBox';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
+    root: {
+      display: 'flex',
+      gap: `${theme.spacing(1)}px`,
+      alignItems: 'center',
+      padding: theme.spacing(1),
+      borderRadius: 3,
+      backgroundColor: theme.palette.background.paper,
+      flexWrap: 'wrap',
+      border: `1px solid ${theme.palette.divider}`,
+    },
     addButton: {
-      height: 40,
-      width: 40,
-      minWidth: 40,
+      height: CRITERION_BOX_HEIGHT,
+      width: CRITERION_BOX_HEIGHT,
+      minWidth: 0,
       color: theme.palette.common.white,
     },
   }),
@@ -172,20 +172,7 @@ export const SearchBarImpl: React.FC<SearchBarProps> = ({
   }, [handleKeyDown]);
 
   return (
-    <Box
-      minHeight={60}
-      display="flex"
-      alignItems="center"
-      pr={2}
-      pl={2}
-      pt={1}
-      pb={1}
-      borderRadius={3}
-      bgcolor="background.paper"
-      flexWrap="wrap"
-      borderColor="grey.400"
-      border={1}
-    >
+    <Box className={classes.root}>
       {criteria.map((criterion, index) => (
         <CriterionBox
           key={criterion.id}

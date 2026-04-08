@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2019 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server.internal.health;
 
@@ -20,12 +11,10 @@ import java.io.IOException;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.junit4.SpringRunner;
 import zipkin.server.ZipkinServer;
 import zipkin2.storage.InMemoryStorage;
 
@@ -37,43 +26,45 @@ import static zipkin2.server.internal.ITZipkinServer.url;
   webEnvironment = SpringBootTest.WebEnvironment.NONE, // RANDOM_PORT requires spring-web
   properties = {
     "server.port=0",
-    "spring.config.name=zipkin-server"
+    "spring.config.name=zipkin-server",
   }
 )
-@RunWith(SpringRunner.class)
-public class ITZipkinHealth {
+class ITZipkinHealth {
   @Autowired InMemoryStorage storage;
   @Autowired PrometheusMeterRegistry registry;
   @Autowired Server server;
 
   OkHttpClient client = new OkHttpClient.Builder().followRedirects(true).build();
 
-  @Before public void init() {
+  @BeforeEach void init() {
     storage.clear();
   }
 
-  @Test public void healthIsOK() throws Exception {
+  @Test void healthIsOK() throws Exception {
     Response health = get("/health");
     assertThat(health.isSuccessful()).isTrue();
     assertThat(health.body().contentType())
       .hasToString("application/json; charset=utf-8");
-    assertThat(health.body().string()).isEqualTo(""
-      + "{\n"
-      + "  \"status\" : \"UP\",\n"
-      + "  \"zipkin\" : {\n"
-      + "    \"status\" : \"UP\",\n"
-      + "    \"details\" : {\n"
-      + "      \"InMemoryStorage{}\" : {\n"
-      + "        \"status\" : \"UP\"\n"
-      + "      }\n"
-      + "    }\n"
-      + "  }\n"
-      + "}"
+    assertThat(health.body().string()).isEqualTo("""
+      {
+        "status" : "UP",
+        "zipkin" : {
+          "status" : "UP",
+          "details" : {
+            "InMemoryStorage{}" : {
+              "status" : "UP"
+            }
+          }
+        }
+      }"""
     );
 
     // ensure we don't track health in prometheus
     assertThat(scrape())
-      .doesNotContain("health");
+      // "application_ready_time_seconds" includes this test's full class name
+      // which includes its package (named health). We care about the endpoint
+      // /health not being in the results, so check for that here.
+      .doesNotContain("/health");
   }
 
   String scrape() throws InterruptedException {
@@ -81,7 +72,7 @@ public class ITZipkinHealth {
     return registry.scrape();
   }
 
-  @Test public void readsHealth() throws Exception {
+  @Test void readsHealth() throws Exception {
     String json = getAsString("/health");
     assertThat(readString(json, "$.status"))
       .isIn("UP", "DOWN", "UNKNOWN");

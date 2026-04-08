@@ -1,16 +1,7 @@
 #!/bin/sh
 #
-# Copyright 2015-2021 The OpenZipkin Authors
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-# in compliance with the License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License
-# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing permissions and limitations under
-# the License.
+# Copyright The OpenZipkin Authors
+# SPDX-License-Identifier: Apache-2.0
 #
 
 # install script used only in building the docker image, but not at runtime.
@@ -39,15 +30,15 @@ cat > pom.xml <<-'EOF'
       <version>${cassandra.version}</version>
       <exclusions>
         <exclusion>
-          <groupId>com.github.jbellis</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>net.java.dev.jna</groupId>
           <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>com.googlecode.concurrent-trees</groupId>
+          <groupId>com.github.jbellis</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.github.jnr</groupId>
           <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
@@ -60,37 +51,51 @@ cat > pom.xml <<-'EOF'
         </exclusion>
       </exclusions>
     </dependency>
-    <!-- Override until Cassandra 4.0 per CASSANDRA-9608 -->
-    <dependency>
-      <groupId>com.github.jbellis</groupId>
-      <artifactId>jamm</artifactId>
-      <version>0.3.3</version>
-    </dependency>
-    <!-- Alpine support CASSANDRA-16212 -->
+    <!-- Use latest to support alpine and additional architecture -->
     <dependency>
       <groupId>net.java.dev.jna</groupId>
       <artifactId>jna</artifactId>
-      <version>5.6.0</version>
+      <version>5.18.1</version>
     </dependency>
-    <!-- NoClassDefFoundError in TrieMemIndex CASSANDRA-16303 (Cassandra 4.0) -->
+    <!-- JFFI 1.2.16 from cassandra-all crashes on aarch64/alpine -->
     <dependency>
-      <groupId>com.googlecode.concurrent-trees</groupId>
-      <artifactId>concurrent-trees</artifactId>
-      <version>2.6.1</version>
+      <groupId>com.github.jnr</groupId>
+      <artifactId>jffi</artifactId>
+      <version>1.3.14</version>
+    </dependency>
+    <dependency>
+      <groupId>com.github.jnr</groupId>
+      <artifactId>jffi</artifactId>
+      <version>1.3.14</version>
+      <classifier>native</classifier>
+    </dependency>
+    <!-- Use latest to work with JRE 21 per CASSANDRA-18329 -->
+    <dependency>
+      <groupId>com.github.jbellis</groupId>
+      <artifactId>jamm</artifactId>
+      <version>0.4.0</version>
     </dependency>
     <!-- log4j not logback -->
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>
-      <version>1.7.30</version>
+      <version>1.7.36</version>
     </dependency>
   </dependencies>
 </project>
 EOF
 mvn -q --batch-mode -DoutputDirectory=lib \
     -Dcassandra.version=${CASSANDRA_VERSION} \
-    org.apache.maven.plugins:maven-dependency-plugin:3.1.2:copy-dependencies
+    org.apache.maven.plugins:maven-dependency-plugin:3.10.0:copy-dependencies
 rm pom.xml
+
+# Get a version of ObjectSizes.java that compiles with jamm 0.4.0
+wget --random-wait --tries=5 -qO ObjectSizes.java \
+  https://raw.githubusercontent.com/apache/cassandra/refs/tags/cassandra-5.0.6/src/java/org/apache/cassandra/utils/ObjectSizes.java
+# Rename a public method back to the same name as used in Cassandra 4.1.
+sed -i 's/sizeOnHeapExcludingDataOf/sizeOnHeapExcludingData/g' ObjectSizes.java
+# Compile it into classes, which overrides the same class from Cassandra 4.1.
+javac -cp 'lib/*' -d classes ObjectSizes.java
 
 # Make sure you use relative paths in references like this, so that installation
 # is decoupled from runtime
@@ -109,7 +114,6 @@ storage_port: 7000
 native_transport_port: 9042
 listen_address: 127.0.0.1
 start_native_transport: true
-start_rpc: false
 seed_provider:
     - class_name: org.apache.cassandra.locator.SimpleSeedProvider
       parameters:
@@ -134,35 +138,49 @@ log4j.appender.stdout.Target=System.out
 EOF
 
 cat zipkin-schemas/zipkin2-schema.cql zipkin-schemas/zipkin2-schema-indexes.cql > schema
-case ${CASSANDRA_VERSION} in
-  3.11* )
-    cqlversion=3.4.4
-    ;;
-  4* )
-    # read_repair_chance options were removed and make Cassandra crash starting in v4
-    # See https://cassandra.apache.org/doc/latest/operating/read_repair.html#background-read-repair
-    sed -i '/read_repair_chance/d' schema
-    cqlversion=3.4.5
-    ;;
-esac
+
+# read_repair_chance options were removed and make Cassandra crash starting in v4
+# See https://cassandra.apache.org/doc/latest/operating/read_repair.html#background-read-repair
+sed -i '/read_repair_chance/d' schema
 
 # Run cassandra on a different port temporarily in order to setup the schema.
-# We also add exports and opens from Cassandra 4, except RMI, which isn't in our JRE image.
-# See https://github.com/apache/cassandra/blob/cassandra-4.0-beta3/conf/jvm11-server.options
+#
+# We also add exports and opens from both Cassandra v4 and v5, except for
+# attach, compiler and rmi because our JRE excludes these modules.
+#
+# Merging makes adding Cassandra v5 easier and lets us share a common JRE 17+
+# with other test images even if Cassandra v4 will never officially support it.
+# https://github.com/apache/cassandra/blob/cassandra-4.1.10/conf/jvm11-server.options
+# https://github.com/apache/cassandra/blob/cassandra-5.0.6/conf/jvm17-server.options
+#
+# Finally, we allow security manager to prevent JRE 21 crashing when Cassandra
+# attempts ThreadAwareSecurityManager.install()
 java -cp 'classes:lib/*' -Xms64m -Xmx64m -XX:+ExitOnOutOfMemoryError -verbose:gc \
+  -Djava.security.manager=allow \
   -Djdk.attach.allowAttachSelf=true \
   --add-exports java.base/jdk.internal.misc=ALL-UNNAMED \
   --add-exports java.base/jdk.internal.ref=ALL-UNNAMED \
   --add-exports java.base/sun.nio.ch=ALL-UNNAMED \
   --add-exports java.sql/java.sql=ALL-UNNAMED \
+  --add-exports java.base/java.lang.ref=ALL-UNNAMED \
+  --add-exports jdk.unsupported/sun.misc=ALL-UNNAMED \
   --add-opens java.base/java.lang.module=ALL-UNNAMED \
   --add-opens java.base/jdk.internal.loader=ALL-UNNAMED \
   --add-opens java.base/jdk.internal.ref=ALL-UNNAMED \
   --add-opens java.base/jdk.internal.reflect=ALL-UNNAMED \
   --add-opens java.base/jdk.internal.math=ALL-UNNAMED \
   --add-opens java.base/jdk.internal.module=ALL-UNNAMED \
-  --add-opens java.base/jdk.internal.util.jar=ALL-UNNAMED \
   --add-opens jdk.management/com.sun.management.internal=ALL-UNNAMED \
+  --add-opens java.base/java.io=ALL-UNNAMED \
+  --add-opens java.base/java.nio=ALL-UNNAMED \
+  --add-opens java.base/sun.nio.ch=ALL-UNNAMED \
+  --add-opens java.base/java.io=ALL-UNNAMED \
+  --add-opens java.base/java.lang.reflect=ALL-UNNAMED \
+  --add-opens java.base/java.lang=ALL-UNNAMED \
+  --add-opens java.base/java.util=ALL-UNNAMED \
+  --add-opens java.base/java.nio=ALL-UNNAMED \
+  --add-opens java.base/java.util.concurrent=ALL-UNNAMED \
+  --add-opens java.base/java.util.concurrent.atomic=ALL-UNNAMED \
   -Dcassandra.storage_port=${temp_storage_port} \
   -Dcassandra.native_transport_port=${temp_native_transport_port} \
   -Dcassandra.storagedir=${PWD} \
@@ -172,7 +190,7 @@ java -cp 'classes:lib/*' -Xms64m -Xmx64m -XX:+ExitOnOutOfMemoryError -verbose:gc
   org.apache.cassandra.service.CassandraDaemon > temp_cassandra.out 2>&1 &
 temp_cassandra_pid=$!
 
-function is_cassandra_alive() {
+is_cassandra_alive() {
   if ! kill -0 ${temp_cassandra_pid}; then
     cat temp_cassandra.out
     maybe_crash_file=hs_err_pid${temp_cassandra_pid}.log
@@ -185,13 +203,26 @@ function is_cassandra_alive() {
 is_cassandra_alive || exit 1
 
 echo "*** Installing cqlsh"
-# stuck on python2 for compatability with cassandra 3.x
-apk add --update --no-cache python2 py2-setuptools
-# use pip version that is compatable with python2
-python2 -m easy_install pip==20.3.4
-pip install -Iq cqlsh
-function cql() {
-  cqlsh --cqlversion=${cqlversion} "$@" 127.0.0.1 ${temp_native_transport_port}
+python3_version=3.14
+apk add --update --no-cache python3=~${python3_version}
+# Installing cqlsh requires cffi package. Normally this doesn't need
+# to be compiled, but something isn't right with aarch64 when installing
+# cqlsh it needs to build cffi. To unblock support for aarch64, adding
+# the following are necessary for compiling cffi. If pip someday changes and
+# doesn't compile cffi on aarch64 then we can remove these dependencies.
+# libev is required when using python 3.12
+# TODO: remove git when https://github.com/jeffwidman/cqlsh/pull/37 is released
+apk add --update --no-cache gcc python3-dev=~${python3_version} musl-dev libffi-dev libev libev-dev git
+# PEP 668 protects against mixing system and pip packages. Setup virtual env to avoid this.
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m ensurepip --upgrade
+pip install --upgrade pip setuptools wheel
+# Installing from trunk since released versions have dependency on old setup tools
+pip install -Iq git+https://github.com/apache/cassandra-python-driver@trunk
+pip install cqlsh
+cql() {
+  cqlsh "$@" 127.0.0.1 ${temp_native_transport_port}
 }
 
 # Excessively long timeout to avoid having to create an ENV variable, decide its name, etc.

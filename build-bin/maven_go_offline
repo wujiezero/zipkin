@@ -1,4 +1,9 @@
 #!/bin/sh -ue
+#
+# Copyright The OpenZipkin Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
 
 build-bin/maven/maven_go_offline
 export MAVEN_OPTS="$(build-bin/maven/maven_opts)"

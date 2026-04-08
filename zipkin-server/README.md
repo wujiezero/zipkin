@@ -1,5 +1,5 @@
 # zipkin-server
-Zipkin Server is a Java 1.8+ service, packaged as an executable jar.
+Zipkin Server is a Java 17+ service, packaged as an executable jar.
 
 Span storage and collectors are [configurable](#configuration). By default, storage is in-memory,
 the HTTP collector (POST /api/v2/spans endpoint) is enabled, and the server listens on port 9411.
@@ -15,20 +15,20 @@ For proper usage, see the guides below.
 
 ## Quick-start
 
-The quickest way to get started is to fetch the [latest released server](https://search.maven.org/remote_content?g=io.zipkin&a=zipkin-server&v=LATEST&c=exec) as a self-contained executable jar. Note that the Zipkin server requires minimum JRE 8. For example:
+The quickest way to get started is to fetch the [latest released server](https://central.sonatype.com/search?q=zipkin&namespace=io.zipkin&name=zipkin-server&sort=published) as a self-contained executable jar. Note that the Zipkin server requires minimum JRE 8. For example:
 
 ```bash
 $ curl -sSL https://zipkin.io/quickstart.sh | bash -s
 $ java -jar zipkin.jar
 ```
 
-Once you've started, browse to http://your_host:9411 to find traces!
+Once you've started, browse to http://localhost:9411/zipkin to find traces!
 
 ## Endpoints
 
-The following endpoints are defined under the base url http://your_host:9411
-* / - [UI](../zipkin-ui)
-* /config.json - [Configuration for the UI](#configuration-for-the-ui)
+The following endpoints are defined under the base url `http://your_host:9411`
+* / - [UI](../zipkin-lens)
+* /config.json - [Configuration for the UI](#ui)
 * /api/v2 - [API](https://zipkin.io/zipkin-api/#/)
 * /health - Returns 200 status if OK
 * /info - Provides the version of the running instance
@@ -111,17 +111,18 @@ exposition [text format version 0.0.4](https://prometheus.io/docs/instrumenting/
 
 ### Collector
 
-Collector metrics are broken down by transport. The following are exported to the "/metrics" endpoint:
+Collector metrics are broken down by transport, where the defaults are "http" and "grpc". The
+following are exported to the "/metrics" endpoint:
 
-Metric | Description
---- | ---
-counter.zipkin_collector.messages.$transport | cumulative messages received; should relate to messages reported by instrumented apps
-counter.zipkin_collector.messages_dropped.$transport | cumulative messages dropped; reasons include client disconnects or malformed content
-counter.zipkin_collector.bytes.$transport | cumulative message bytes
-counter.zipkin_collector.spans.$transport | cumulative spans read; should relate to messages reported by instrumented apps
-counter.zipkin_collector.spans_dropped.$transport | cumulative spans dropped; reasons include sampling or storage failures
-gauge.zipkin_collector.message_spans.$transport | last count of spans in a message
-gauge.zipkin_collector.message_bytes.$transport | last count of bytes in a message
+| Metric                                               | Description                                                                           |
+|------------------------------------------------------|---------------------------------------------------------------------------------------|
+| counter.zipkin_collector.messages.$transport         | cumulative messages received; should relate to messages reported by instrumented apps |
+| counter.zipkin_collector.messages_dropped.$transport | cumulative messages dropped; reasons include client disconnects or malformed content  |
+| counter.zipkin_collector.bytes.$transport            | cumulative message bytes                                                              |
+| counter.zipkin_collector.spans.$transport            | cumulative spans read; should relate to messages reported by instrumented apps        |
+| counter.zipkin_collector.spans_dropped.$transport    | cumulative spans dropped; reasons include sampling or storage failures                |
+| gauge.zipkin_collector.message_spans.$transport      | last count of spans in a message                                                      |
+| gauge.zipkin_collector.message_bytes.$transport      | last count of bytes in a message                                                      |
 
 ## Configuration
 We support ENV variable configuration, such as `STORAGE_TYPE=cassandra3`, as they are familiar to
@@ -131,11 +132,12 @@ Here are the top-level configuration of Zipkin:
 * `QUERY_PORT`: Listen port for the HTTP API and web UI; Defaults to 9411
 * `QUERY_ENABLED`: `false` disables the HTTP read endpoints under '/api/v2'. This also disables the
 UI, as it relies on the API. If your only goal is to restrict search, use `SEARCH_ENABLED` instead.
-Defaults to true
+If your only goal is to disable the UI, use `UI_ENABLED` instead. Defaults to true
 * `SEARCH_ENABLED`: `false` disables searching in the query API and any indexing or post-processing
 in the collector to support search. This does not disable the entire UI, as trace by ID and
 dependency queries still operate. Disable this when you use another service (such as logs) to find
 trace IDs. Defaults to true
+* `UI_ENABLED`: `false` disables the web UI, mounted at '/zipkin'. Defaults to true
 * `QUERY_TIMEOUT`: Sets the hard timeout for query requests. Accepts any duration string (e.g., 100ms).
 A value of 0 will disable the timeout completely. Defaults to 11s.
 * `QUERY_LOG_LEVEL`: Log level written to the console; Defaults to INFO
@@ -166,25 +168,26 @@ mention this because configuration of Spring implies vast responsibility and our
 conserved for Zipkin related tasks.
 
 ## UI
-Zipkin has a web UI, automatically included in the exec jar, and is hosted by default on port 9411.
+Zipkin has a web UI, automatically included in the exec jar, and is hosted by default on port 9411
+under the path '/zipkin'. This is enabled unless `UI_ENABLED` or `QUERY_ENABLED` are set to false.
 
 When the UI loads, it reads default configuration from the `/config.json` endpoint.
 
-Attribute | Property | Description
---- | --- | ---
-environment | zipkin.ui.environment | The value here becomes a label in the top-right corner. Not required.
-defaultLookback | zipkin.ui.default-lookback | Default duration in millis to look back when finding traces. Affects the "Start time" element in the UI. Defaults to 900000 (15 minutes in millis).
-searchEnabled | zipkin.ui.search-enabled | If the Discover screen is enabled. Defaults to true.
-queryLimit | zipkin.ui.query-limit | Default limit for Find Traces. Defaults to 10.
-instrumented | zipkin.ui.instrumented | Which sites this Zipkin UI covers. Regex syntax. e.g. `http:\/\/example.com\/.*` Defaults to match all websites (`.*`).
-logsUrl | zipkin.ui.logs-url | Logs query service url pattern. If specified, a button will appear on the trace page and will replace {traceId} in the url by the traceId. Not required.
-supportUrl | zipkin.ui.support-url | A URL where a user can ask for support. If specified, a link will be placed in the side menu to this URL, for example a page to file support tickets. Not required.
-archivePostUrl | zipkin.ui.archive-post-url | Url to POST the current trace in Zipkin v2 json format. e.g. 'https://longterm/api/v2/spans'. If specified, a button will appear on the trace page accordingly. Not required.
-archiveUrl | zipkin.ui.archive-url | Url to a web application serving an archived trace, templated by '{traceId}'. e.g. https://longterm/zipkin/trace/{traceId}'. This is shown in a confirmation message after a trace is successfully POSTed to the `archivePostUrl`. Not required.
-dependency.enabled | zipkin.ui.dependency.enabled | If the Dependencies screen is enabled. Defaults to true.
-dependency.lowErrorRate | zipkin.ui.dependency.low-error-rate | The rate of error calls on a dependency link that turns it yellow. Defaults to 0.5 (50%) set to >1 to disable.
-dependency.highErrorRate | zipkin.ui.dependency.high-error-rate | The rate of error calls on a dependency link that turns it red. Defaults to 0.75 (75%) set to >1 to disable.
-basePath | zipkin.ui.basepath | path prefix placed into the <base> tag in the UI HTML; useful when running behind a reverse proxy. Default "/zipkin"
+| Attribute                | Property                             | Description                                                                                                                                                                                                                                       |
+|--------------------------|--------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| environment              | zipkin.ui.environment                | The value here becomes a label in the top-right corner. Not required.                                                                                                                                                                             |
+| defaultLookback          | zipkin.ui.default-lookback           | Default duration in millis to look back when finding traces. Affects the "Start time" element in the UI. Defaults to 900000 (15 minutes in millis).                                                                                               |
+| searchEnabled            | zipkin.ui.search-enabled             | If the Discover screen is enabled. Defaults to true.                                                                                                                                                                                              |
+| queryLimit               | zipkin.ui.query-limit                | Default limit for Find Traces. Defaults to 10.                                                                                                                                                                                                    |
+| instrumented             | zipkin.ui.instrumented               | Which sites this Zipkin UI covers. Regex syntax. e.g. `http:\/\/example.com\/.*` Defaults to match all websites (`.*`).                                                                                                                           |
+| logsUrl                  | zipkin.ui.logs-url                   | Logs query service url pattern. If specified, a button will appear on the trace page and will replace {traceId} in the url by the traceId. Not required.                                                                                          |
+| supportUrl               | zipkin.ui.support-url                | A URL where a user can ask for support. If specified, a link will be placed in the side menu to this URL, for example a page to file support tickets. Not required.                                                                               |
+| archivePostUrl           | zipkin.ui.archive-post-url           | Url to POST the current trace in Zipkin v2 json format. e.g. `https://longterm/api/v2/spans`. If specified, a button will appear on the trace page accordingly. Not required.                                                                     |
+| archiveUrl               | zipkin.ui.archive-url                | Url to a web application serving an archived trace, templated by '{traceId}'. e.g. `https://longterm/zipkin/trace/{traceId}`. This is shown in a confirmation message after a trace is successfully POSTed to the `archivePostUrl`. Not required. |
+| dependency.enabled       | zipkin.ui.dependency.enabled         | If the Dependencies screen is enabled. Defaults to true.                                                                                                                                                                                          |
+| dependency.lowErrorRate  | zipkin.ui.dependency.low-error-rate  | The rate of error calls on a dependency link that turns it yellow. Defaults to 0.5 (50%) set to >1 to disable.                                                                                                                                    |
+| dependency.highErrorRate | zipkin.ui.dependency.high-error-rate | The rate of error calls on a dependency link that turns it red. Defaults to 0.75 (75%) set to >1 to disable.                                                                                                                                      |
+| basePath                 | zipkin.ui.basepath                   | path prefix placed into the <base> tag in the UI HTML; useful when running behind a reverse proxy. Default "/zipkin"                                                                                                                              |
 
 To map properties to environment variables, change them to upper-underscore case format. For
 example, if using docker you can set `ZIPKIN_UI_QUERY_LIMIT=100` to affect `$.queryLimit` in `/config.json`.
@@ -231,6 +234,7 @@ and applies when `STORAGE_TYPE` is set to `cassandra3`:
     * `CASSANDRA_ENSURE_SCHEMA`: Ensuring cassandra has the latest schema. If enabled tries to execute scripts in the classpath prefixed with `cassandra-schema-cql3`. Defaults to true
     * `CASSANDRA_USERNAME` and `CASSANDRA_PASSWORD`: Cassandra authentication. Will throw an exception on startup if authentication fails. No default
     * `CASSANDRA_USE_SSL`: Requires `javax.net.ssl.trustStore` and `javax.net.ssl.trustStorePassword`, defaults to false.
+    * `CASSANDRA_SSL_HOSTNAME_VALIDATION`: Controls validation of Cassandra server hostname. defaults to true.
 
 The following are tuning parameters which may not concern all users:
 
@@ -247,7 +251,8 @@ $ STORAGE_TYPE=cassandra3 java -jar zipkin.jar \
 
 ### Elasticsearch Storage
 Zipkin's [Elasticsearch storage component](../zipkin-storage/elasticsearch)
-supports versions 5-7.x and applies when `STORAGE_TYPE` is set to `elasticsearch`
+supports versions Elasticsearch 7-8.x and OpenSearch 2.x and applies when
+`STORAGE_TYPE` is set to `elasticsearch`
 
 The following apply when `STORAGE_TYPE` is set to `elasticsearch`:
 
@@ -255,7 +260,7 @@ The following apply when `STORAGE_TYPE` is set to `elasticsearch`:
                   Defaults to "http://localhost:9200".
     * `ES_PIPELINE`: Indicates the ingest pipeline used before spans are indexed. No default.
     * `ES_TIMEOUT`: Controls the connect, read and write socket timeouts (in milliseconds) for
-                    Elasticsearch API. Defaults to 10000 (10 seconds)
+                    Elasticsearch / OpenSearch API. Defaults to 10000 (10 seconds)
     * `ES_INDEX`: The index prefix to use when generating daily index names. Defaults to zipkin.
     * `ES_DATE_SEPARATOR`: The date separator to use when generating daily index names. Defaults to '-'.
     * `ES_INDEX_SHARDS`: The number of shards to split the index into. Each shard and its replicas
@@ -274,9 +279,9 @@ The following apply when `STORAGE_TYPE` is set to `elasticsearch`:
                              you set this to false, you choose to troubleshoot your own data or
                              migration problems as opposed to relying on the community for this.
                              Defaults to true.
-    * `ES_USERNAME` and `ES_PASSWORD`: Elasticsearch basic authentication, which defaults to empty string.
+    * `ES_USERNAME` and `ES_PASSWORD`: Elasticsearch / OpenSearch basic authentication, which defaults to empty string.
                                        Use when X-Pack security (formerly Shield) is in place.
-    * `ES_CREDENTIALS_FILE`: The location of a file containing Elasticsearch basic authentication
+    * `ES_CREDENTIALS_FILE`: The location of a file containing Elasticsearch / OpenSearch basic authentication
                              credentials, as properties. The username property is
                              `zipkin.storage.elasticsearch.username`, password `zipkin.storage.elasticsearch.password`.
                              This file is reloaded periodically, using `ES_CREDENTIALS_REFRESH_INTERVAL`
@@ -285,7 +290,7 @@ The following apply when `STORAGE_TYPE` is set to `elasticsearch`:
     * `ES_CREDENTIALS_REFRESH_INTERVAL`: Credentials refresh interval in seconds, which defaults to
                                          1 second. This is the maximum amount of time spans will drop due to stale
                                          credentials. Any errors reading the credentials file occur in logs at this rate.
-    * `ES_HTTP_LOGGING`: When set, controls the volume of HTTP logging of the Elasticsearch API.
+    * `ES_HTTP_LOGGING`: When set, controls the volume of HTTP logging of the Elasticsearch / OpenSearch API.
                          Options are BASIC, HEADERS, BODY
     * `ES_SSL_NO_VERIFY`: When true, disables the verification of server's key certificate chain.
                           This is not appropriate for production. Defaults to false.
@@ -299,13 +304,13 @@ To connect normally:
 $ STORAGE_TYPE=elasticsearch ES_HOSTS=http://myhost:9200 java -jar zipkin.jar
 ```
 
-To log Elasticsearch API requests:
+To log Elasticsearch / OpenSearch API requests:
 ```bash
 $ STORAGE_TYPE=elasticsearch ES_HTTP_LOGGING=BASIC java -jar zipkin.jar
 ```
 
 #### Using a custom Key Store or Trust Store (SSL)
-If your Elasticsearch endpoint customized SSL configuration (for example self-signed) certificates,
+If your Elasticsearch / OpenSearch endpoint customized SSL configuration (for example self-signed) certificates,
 you can use any of the following [subset of JSSE properties](https://docs.oracle.com/javase/8/docs/technotes/guides/security/jsse/JSSERefGuide.html#T6) to connect.
 
  * javax.net.ssl.keyStore
@@ -322,13 +327,13 @@ $ STORAGE_TYPE=elasticsearch java $JAVA_OPTS -jar zipkin.jar
 ```
 
 Under the scenes, these map to properties prefixed `zipkin.storage.elasticsearch.ssl.`, which affect
-the Armeria client used to connect to Elasticsearch.
+the Armeria client used to connect to Elasticsearch / OpenSearch.
 
 The above properties allow the most common SSL setup to work out of box. If you need more
 customization, please make a comment in [this issue](https://github.com/openzipkin/zipkin/issues/2774).
 
 #### Automatic Index Creation
-Zipkin will automatically create new indices as needed. Elasticsearch by default [allows](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-index_.html#index-creation) automatic creation of said indices, though your local install may have been configured to disallow it. You can verify this in the cluster settings: `action.auto_create_index: false`.
+Zipkin will automatically create new indices as needed. Elasticsearch / OpenSearch by default [allows](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-index_.html#index-creation) automatic creation of said indices, though your local install may have been configured to disallow it. You can verify this in the cluster settings: `action.auto_create_index: false`.
 
 ### Legacy (v1) storage components
 The following components are no longer encouraged, but exist to help aid
@@ -375,36 +380,37 @@ As this feature is experimental, it is not recommended to run this in production
 ## Collector
 
 ### HTTP Collector
-The HTTP collector is enabled by default. It accepts spans via `POST /api/v1/spans` and `POST /api/v2/spans`.
+The HTTP collector is enabled by default. It accepts spans via `POST /api/v1/spans` and
+`POST /api/v2/spans`, on the `${QUERY_PORT}` which defaults to 9411.
+
 The HTTP collector supports the following configuration:
 
-Property | Environment Variable | Description
---- | --- | ---
-`zipkin.collector.http.enabled` | `COLLECTOR_HTTP_ENABLED` | `false` disables the HTTP collector. Defaults to `true`.
+| Property                        | Environment Variable     | Description                                              |
+|---------------------------------|--------------------------|----------------------------------------------------------|
+| `zipkin.collector.http.enabled` | `COLLECTOR_HTTP_ENABLED` | `false` disables the HTTP collector. Defaults to `true`. |
 
 ### Scribe (Legacy) Collector
 A collector supporting Scribe is enabled when `COLLECTOR_SCRIBE_ENABLED=true`. New
 sites are discouraged from using this collector as Scribe is an archived
 technology.
 
-Environment Variable | Property | Description
---- | --- | ---
-`COLLECTOR_PORT` | `zipkin.collector.scribe.port` | The port to listen for thrift RPC scribe requests. Defaults to 9410
-`SCRIBE_CATEGORY` | `zipkin.collector.scribe.category` | Category zipkin spans will be consumed from. Defaults to `zipkin`
-
+| Environment Variable | Property                           | Description                                                         |
+|----------------------|------------------------------------|---------------------------------------------------------------------|
+| `COLLECTOR_PORT`     | `zipkin.collector.scribe.port`     | The port to listen for thrift RPC scribe requests. Defaults to 9410 |
+| `SCRIBE_CATEGORY`    | `zipkin.collector.scribe.category` | Category zipkin spans will be consumed from. Defaults to `zipkin`   |
 
 ### ActiveMQ Collector
 The [ActiveMQ Collector](../zipkin-collector/activemq) is enabled when `ACTIVEMQ_URL` is set to a v5.x broker. The following settings apply in this case.
 
-Environment Variable | Property | Description
---- | --- | ---
-`COLLECTOR_ACTIVEMQ_ENABLED` | `zipkin.collector.activemq.enabled` | `false` disables the ActiveMQ collector. Defaults to `true`.
-`ACTIVEMQ_URL` | `zipkin.collector.activemq.url` | [Connection URL](https://activemq.apache.org/uri-protocols) to the ActiveMQ broker, ex. `tcp://localhost:61616` or `failover:(tcp://localhost:61616,tcp://remotehost:61616)`
-`ACTIVEMQ_QUEUE` | `zipkin.collector.activemq.queue` | Queue from which to collect span messages. Defaults to `zipkin`
-`ACTIVEMQ_CLIENT_ID_PREFIX` | `zipkin.collector.activemq.client-id-prefix` | Client ID prefix for queue consumers. Defaults to `zipkin`
-`ACTIVEMQ_CONCURRENCY` | `zipkin.collector.activemq.concurrency` | Number of concurrent span consumers. Defaults to `1`
-`ACTIVEMQ_USERNAME` | `zipkin.collector.activemq.username` | Optional username to connect to the broker
-`ACTIVEMQ_PASSWORD`| `zipkin.collector.activemq.password` | Optional password to connect to the broker
+| Environment Variable         | Property                                     | Description                                                                                                                                                                  |
+|------------------------------|----------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `COLLECTOR_ACTIVEMQ_ENABLED` | `zipkin.collector.activemq.enabled`          | `false` disables the ActiveMQ collector. Defaults to `true`.                                                                                                                 |
+| `ACTIVEMQ_URL`               | `zipkin.collector.activemq.url`              | [Connection URL](https://activemq.apache.org/uri-protocols) to the ActiveMQ broker, ex. `tcp://localhost:61616` or `failover:(tcp://localhost:61616,tcp://remotehost:61616)` |
+| `ACTIVEMQ_QUEUE`             | `zipkin.collector.activemq.queue`            | Queue from which to collect span messages. Defaults to `zipkin`                                                                                                              |
+| `ACTIVEMQ_CLIENT_ID_PREFIX`  | `zipkin.collector.activemq.client-id-prefix` | Client ID prefix for queue consumers. Defaults to `zipkin`                                                                                                                   |
+| `ACTIVEMQ_CONCURRENCY`       | `zipkin.collector.activemq.concurrency`      | Number of concurrent span consumers. Defaults to `1`                                                                                                                         |
+| `ACTIVEMQ_USERNAME`          | `zipkin.collector.activemq.username`         | Optional username to connect to the broker                                                                                                                                   |
+| `ACTIVEMQ_PASSWORD`          | `zipkin.collector.activemq.password`         | Optional password to connect to the broker                                                                                                                                   |
 
 Example usage:
 
@@ -415,15 +421,15 @@ $ ACTIVEMQ_URL=tcp://localhost:61616 java -jar zipkin.jar
 ### Kafka Collector
 The Kafka collector is enabled when `KAFKA_BOOTSTRAP_SERVERS` is set to
 a v0.10+ server. The following settings apply in this case. Some settings
-correspond to "New Consumer Configs" in [Kafka documentation](https://kafka.apache.org/documentation/#newconsumerconfigs).
+correspond to "New Consumer Configs" in [Kafka documentation](https://kafka.apache.org/documentation/#consumerconfigs).
 
-Variable | New Consumer Config | Description
---- | --- | ---
-`COLLECTOR_KAFKA_ENABLED` | N/A | `false` disables the Kafka collector. Defaults to `true`.
-`KAFKA_BOOTSTRAP_SERVERS` | bootstrap.servers | Comma-separated list of brokers, ex. 127.0.0.1:9092. No default
-`KAFKA_GROUP_ID` | group.id | The consumer group this process is consuming on behalf of. Defaults to `zipkin`
-`KAFKA_TOPIC` | N/A | Comma-separated list of topics that zipkin spans will be consumed from. Defaults to `zipkin`
-`KAFKA_STREAMS` | N/A | Count of threads consuming the topic. Defaults to `1`
+| Variable                  | New Consumer Config | Description                                                                                  |
+|---------------------------|---------------------|----------------------------------------------------------------------------------------------|
+| `COLLECTOR_KAFKA_ENABLED` | N/A                 | `false` disables the Kafka collector. Defaults to `true`.                                    |
+| `KAFKA_BOOTSTRAP_SERVERS` | bootstrap.servers   | Comma-separated list of brokers, ex. 127.0.0.1:9092. No default                              |
+| `KAFKA_GROUP_ID`          | group.id            | The consumer group this process is consuming on behalf of. Defaults to `zipkin`              |
+| `KAFKA_TOPIC`             | N/A                 | Comma-separated list of topics that zipkin spans will be consumed from. Defaults to `zipkin` |
+| `KAFKA_STREAMS`           | N/A                 | Count of threads consuming the topic. Defaults to `1`                                        |
 
 Example usage:
 
@@ -434,7 +440,7 @@ $ KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
 
 #### Other Kafka consumer properties
 You may need to set other
-[Kafka consumer properties](https://kafka.apache.org/documentation/#newconsumerconfigs), in
+[Kafka consumer properties](https://kafka.apache.org/documentation/#consumerconfigs), in
 addition to the ones with explicit properties defined by the collector. In this case, you need to
 prefix that property name with `zipkin.collector.kafka.overrides` and pass it as a system property
 argument.
@@ -445,6 +451,60 @@ For example, to override `auto.offset.reset`, you can set a system property name
 ```bash
 $ KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
     java -Dzipkin.collector.kafka.overrides.auto.offset.reset=latest -jar zipkin.jar
+```
+
+
+### Pulsar Collector
+The Pulsar collector is enabled when `PULSAR_SERVICE_URL` is set to
+a v4.x+ server. The following settings apply in this case.
+Some settings correspond to "New Client Configs" in [Pulsar client properties](https://github.com/apache/pulsar/blob/master/pulsar-client/src/main/java/org/apache/pulsar/client/impl/conf/ClientConfigurationData.java)
+and "New Consumer Configs" in [Pulsar consumer properties](https://github.com/apache/pulsar/blob/master/pulsar-client/src/main/java/org/apache/pulsar/client/impl/conf/ConsumerConfigurationData.java).
+
+| Variable                   | Property                                    | Description                                                                    |
+|----------------------------|---------------------------------------------|--------------------------------------------------------------------------------|
+| `COLLECTOR_PULSAR_ENABLED` | `zipkin.collector.pulsar.enabled`           | `false` disables the Pulsar collector. Defaults to `true`.                     |
+| `PULSAR_SERVICE_URL`       | `zipkin.collector.pulsar.service-url`       | The service URL for the Pulsar client ex. pulsar://my-broker:6650. No default. |
+| `PULSAR_TOPIC`             | `zipkin.collector.pulsar.topic`             | Queue zipkin spans will be consumed from. Defaults to "zipkin".                |
+| `PULSAR_SUBSCRIPTION_NAME` | `zipkin.collector.pulsar.subscription-name` | Specify the subscription name for this consumer. No default.                   |
+| `PULSAR_CONCURRENCY`       | `zipkin.collector.pulsar.concurrency`       | Count of concurrent message consumers on the topic. Defaults to 1              |
+
+Example usage:
+
+```bash
+$ PULSAR_SERVICE_URL=pulsar://localhost:6650 \
+    java -jar zipkin.jar
+```
+
+
+#### Other Pulsar client properties
+You may need to set other
+[Pulsar client properties](https://github.com/apache/pulsar/blob/master/pulsar-client/src/main/java/org/apache/pulsar/client/impl/conf/ClientConfigurationData.java), in
+addition to the ones with explicit properties defined by the collector. In this case, you need to
+prefix that property name with `zipkin.collector.pulsar.client-props` and pass it as a system property
+argument.
+
+For example, to set `num.io.threads`, you can set a system property named
+`zipkin.collector.pulsar.client-props.numIoThreads`:
+
+```bash
+$ PULSAR_SERVICE_URL=pulsar://localhost:6650 \
+    java -Dzipkin.collector.pulsar.client-props.numIoThreads=20 -jar zipkin.jar
+```
+
+
+#### Other Pulsar consumer properties
+You may need to set other
+[Pulsar consumer properties](https://github.com/apache/pulsar/blob/master/pulsar-client/src/main/java/org/apache/pulsar/client/impl/conf/ConsumerConfigurationData.java), in
+addition to the ones with explicit properties defined by the collector. In this case, you need to
+prefix that property name with `zipkin.collector.pulsar.consumer-props` and pass it as a system property
+argument.
+
+For example, to set `receiver.queue.size`, you can set a system property named
+`zipkin.collector.pulsar.consumer-props.receiverQueueSize`:
+
+```bash
+$ PULSAR_SERVICE_URL=pulsar://localhost:6650 \
+    java -Dzipkin.collector.pulsar.consumer-props.receiverQueueSize=2000 -jar zipkin.jar
 ```
 
 #### Detailed examples
@@ -492,18 +552,52 @@ Example usage:
 $ RABBIT_ADDRESSES=localhost java -jar zipkin.jar
 ```
 
-### gRPC Collector (Experimental)
-You can enable a gRPC span collector endpoint by setting `COLLECTOR_GRPC_ENABLED=true`. The
-`zipkin.proto3.SpanService/Report` endpoint will run on the same port as normal HTTP (9411).
+### gRPC Collector
 
+The gRPC collector is enabled by default. It accepts spans via `zipkin.proto3.SpanService/Report`,
+on the `${QUERY_PORT}` which defaults to 9411.
+
+The gRPC collector supports the following configuration:
+
+| Variable                 | Description                                            |
+|--------------------------|--------------------------------------------------------|
+| `COLLECTOR_GRPC_ENABLED` | `false` disables the gRPC service. Defaults to `true`. |
+
+The proto definition is here: https://github.com/openzipkin/zipkin-api/blob/master/zipkin.proto
+
+## Service Registration
+
+### Eureka
+
+Zipkin can register itself in [Eureka](https://github.com/Netflix/eureka), allowing traced services
+to discover its listen address and health state. This is enabled when `EUREKA_SERVICE_URL` is set to
+a valid v2 endpoint of the [Eureka REST API](https://github.com/Netflix/eureka/wiki/Eureka-REST-operations).
+
+| Variable                   | Instance field | Description                                                             |
+|----------------------------|----------------|-------------------------------------------------------------------------|
+| `DISCOVERY_EUREKA_ENABLED` | N/A            | `false` disables Eureka registration. Defaults to `true`.               |
+| `EUREKA_SERVICE_URL`       | N/A            | v2 endpoint of Eureka, e.g. `https://eureka-prod/eureka/v2`. No default |
+| `EUREKA_APP_NAME`          | .app           | The application this instance registers to. Defaults to `zipkin`        |
+| `EUREKA_HOSTNAME`          | .hostName      | The instance `hostName`. Defaults to detect.                            |
+| `EUREKA_INSTANCE_ID`       | .instanceId    | Defaults to `${EUREKA_HOSTNAME}:${EUREKA_APP_NAME}:${QUERY_PORT}`.      |
 
 Example usage:
 
 ```bash
-$ COLLECTOR_GRPC_ENABLED=true java -jar zipkin.jar
+$ EUREKA_SERVICE_URL=http://localhost:8761/eureka/v2 java -jar zipkin.jar
 ```
 
-As this service is experimental, it is not recommended to run this in production environments.
+If you are using a containerized environment, you may need to set `EUREKA_HOSTNAME` to avoid
+detecting the wrong hostname. For example, if using docker-compose, set `EUREKA_HOSTNAME` to
+zipkin's `container_name`.
+
+If your Eureka server requires authentication, adjust `EUREKA_SERVICE_URL` accordingly. If user info
+is present, those credentials will be used for BASIC authentication. For example, if the URL is
+`https://myuser:mypassword@1.1.3.1/eureka/v2/`, requests to Eureka will authenticate with the user
+"myuser" and password "mypassword".
+
+Note: Eureka server registration only includes host and port details. Tracers need to resolve this
+to the POST endpoint "/api/v2/spans".
 
 ## Self-Tracing
 Self tracing exists to help troubleshoot performance of the zipkin-server. Production deployments
@@ -513,11 +607,11 @@ who enable self-tracing should lower the sample rate from 1.0 (100%) to a much s
 When `zipkin.self-tracing.enabled=true`, Zipkin will self-trace calls to the API under the service
 name "zipkin-server".
 
-Variable | Property | Description
---- | --- | ---
-SELF_TRACING_ENABLED | zipkin.self-tracing.enabled | Set to true to enable self-tracing. Defaults to false
-SELF_TRACING_SAMPLE_RATE | zipkin.self-tracing.sample-rate | Percentage of self-traces to retain, defaults to always sample (1.0).
-SELF_TRACING_FLUSH_INTERVAL | zipkin.self-tracing.flush-interval | Interval in seconds to flush self-tracing data to storage. Defaults to 1
+| Variable                    | Property                           | Description                                                              |
+|-----------------------------|------------------------------------|--------------------------------------------------------------------------|
+| SELF_TRACING_ENABLED        | zipkin.self-tracing.enabled        | Set to true to enable self-tracing. Defaults to false                    |
+| SELF_TRACING_SAMPLE_RATE    | zipkin.self-tracing.sample-rate    | Percentage of self-traces to retain, defaults to always sample (1.0).    |
+| SELF_TRACING_FLUSH_INTERVAL | zipkin.self-tracing.flush-interval | Interval in seconds to flush self-tracing data to storage. Defaults to 1 |
 
 ### 128-bit trace IDs
 

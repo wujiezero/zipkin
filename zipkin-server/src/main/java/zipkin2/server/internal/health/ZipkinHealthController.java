@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server.internal.health;
 
@@ -53,8 +44,10 @@ public class ZipkinHealthController {
     CompletableFuture<HttpResponse> responseFuture = new CompletableFuture<>();
     ctx.whenRequestTimingOut().handle((unused, unused2) -> {
       try {
-        String healthJson = writeJsonError("Timed out computing health status. "
-          + "This often means your storage backend is unreachable.");
+        String healthJson = writeJsonError("""
+          Timed out computing health status. \
+          This often means your storage backend is unreachable.\
+          """);
         responseFuture.complete(newHealthResponse(STATUS_DOWN, mediaType, healthJson));
       } catch (Throwable e) {
         // Shouldn't happen since we serialize to an array.
@@ -70,7 +63,7 @@ public class ZipkinHealthController {
           // Computing health of a component may block so we make sure to invoke in the blocking
           // executor.
           ctx.blockingTaskExecutor()))
-      .collect(Collectors.toList());
+      .toList();
 
     CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
       .handle((unused, t) -> {
@@ -93,7 +86,10 @@ public class ZipkinHealthController {
 
     String overallStatus = STATUS_UP;
     for (ComponentHealth health : healths) {
-      if (health.status.equals(STATUS_DOWN)) overallStatus = STATUS_DOWN;
+      if (health.status.equals(STATUS_DOWN)) {
+        overallStatus = STATUS_DOWN;
+        break;
+      }
     }
 
     final String healthJson;

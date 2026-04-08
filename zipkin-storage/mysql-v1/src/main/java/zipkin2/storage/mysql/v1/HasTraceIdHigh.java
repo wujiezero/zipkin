@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2019 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.storage.mysql.v1;
 
@@ -26,15 +17,17 @@ import static zipkin2.storage.mysql.v1.internal.generated.tables.ZipkinSpans.ZIP
 final class HasTraceIdHigh {
   static final Logger LOG = Logger.getLogger(HasTraceIdHigh.class.getName());
   static final String MESSAGE =
-      "zipkin_spans.trace_id_high doesn't exist, so 128-bit trace ids are not supported. "
-          + "Execute: ALTER TABLE zipkin_spans ADD `trace_id_high` BIGINT NOT NULL DEFAULT 0;\n"
-          + "ALTER TABLE zipkin_annotations ADD `trace_id_high` BIGINT NOT NULL DEFAULT 0;\n"
-          + "ALTER TABLE zipkin_spans"
-          + "   DROP INDEX trace_id,\n"
-          + "   ADD UNIQUE KEY(`trace_id_high`, `trace_id`, `id`);\n"
-          + "ALTER TABLE zipkin_annotations\n"
-          + "   DROP INDEX trace_id,\n"
-          + "   ADD UNIQUE KEY(`trace_id_high`, `trace_id`, `span_id`, `a_key`, `a_timestamp`);";
+      """
+      zipkin_spans.trace_id_high doesn't exist, so 128-bit trace ids are not supported. \
+      Execute: ALTER TABLE zipkin_spans ADD `trace_id_high` BIGINT NOT NULL DEFAULT 0;
+      ALTER TABLE zipkin_annotations ADD `trace_id_high` BIGINT NOT NULL DEFAULT 0;
+      ALTER TABLE zipkin_spans\
+         DROP INDEX trace_id,
+         ADD UNIQUE KEY(`trace_id_high`, `trace_id`, `id`);
+      ALTER TABLE zipkin_annotations
+         DROP INDEX trace_id,
+         ADD UNIQUE KEY(`trace_id_high`, `trace_id`, `span_id`, `a_key`, `a_timestamp`);\
+      """;
 
   static boolean test(DataSource datasource, DSLContexts context) {
     try (Connection conn = datasource.getConnection()) {

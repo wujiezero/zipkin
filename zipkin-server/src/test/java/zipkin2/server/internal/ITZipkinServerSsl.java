@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2020 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server.internal;
 
@@ -20,12 +11,10 @@ import com.linecorp.armeria.common.HttpStatus;
 import com.linecorp.armeria.common.SessionProtocol;
 import com.linecorp.armeria.server.Server;
 import com.linecorp.armeria.spring.ArmeriaSettings;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.junit4.SpringRunner;
 import zipkin.server.ZipkinServer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,22 +45,21 @@ import static zipkin2.server.internal.elasticsearch.Access.configureSsl;
     "armeria.ports[0].port=${server.port}",
     "armeria.ports[0].protocols[0]=http",
   })
-@RunWith(SpringRunner.class)
-public class ITZipkinServerSsl {
+class ITZipkinServerSsl {
   @Autowired Server server;
   @Autowired ArmeriaSettings armeriaSettings;
 
   ClientFactory clientFactory;
 
-  @Before public void configureClientFactory() {
+  @BeforeEach void configureClientFactory() {
     clientFactory = configureSsl(ClientFactory.builder(), armeriaSettings.getSsl()).build();
   }
 
-  @Test public void callHealthEndpoint_HTTP() {
+  @Test void callHealthEndpoint_HTTP() {
     callHealthEndpoint(SessionProtocol.HTTP);
   }
 
-  @Test public void callHealthEndpoint_HTTPS() {
+  @Test void callHealthEndpoint_HTTPS() {
     callHealthEndpoint(SessionProtocol.HTTPS);
   }
 

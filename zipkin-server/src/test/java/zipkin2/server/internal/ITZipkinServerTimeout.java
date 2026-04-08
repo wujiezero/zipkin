@@ -1,15 +1,6 @@
 /*
- * Copyright 2015-2021 The OpenZipkin Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ * Copyright The OpenZipkin Authors
+ * SPDX-License-Identifier: Apache-2.0
  */
 package zipkin2.server.internal;
 
@@ -19,13 +10,11 @@ import java.util.List;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.junit4.SpringRunner;
 import zipkin.server.ZipkinServer;
 import zipkin2.Call;
 import zipkin2.DependencyLink;
@@ -37,7 +26,6 @@ import zipkin2.storage.QueryRequest;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
 
-import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
@@ -46,13 +34,12 @@ import static org.mockito.Mockito.when;
   webEnvironment = SpringBootTest.WebEnvironment.NONE, // RANDOM_PORT requires spring-web
   properties = {
     "server.port=0",
-    "zipkin.query.timeout=1ms",
-    "spring.config.name=zipkin-server"
+    "spring.config.name=zipkin-server",
+    "zipkin.query.timeout=1ms"
   }
 )
-@RunWith(SpringRunner.class)
-public class ITZipkinServerTimeout {
-  static final List<Span> TRACE = asList(TestObjects.CLIENT_SPAN);
+class ITZipkinServerTimeout {
+  static final List<Span> TRACE = List.of(TestObjects.CLIENT_SPAN);
 
   SlowSpanStore spanStore;
 
@@ -61,13 +48,13 @@ public class ITZipkinServerTimeout {
 
   OkHttpClient client = new OkHttpClient.Builder().followRedirects(true).build();
 
-  @Before public void init() {
+  @BeforeEach void init() {
     spanStore = new SlowSpanStore();
     when(storage.spanStore()).thenReturn(spanStore);
     when(storage.traces()).thenReturn(new TracesAdapter(spanStore));
   }
 
-  @Test public void getTrace() throws Exception {
+  @Test void getTrace() throws Exception {
     spanStore.storage.accept(TRACE).execute();
 
     Response response = get("/api/v2/trace/" + TRACE.get(0).traceId());
